@@ -1,0 +1,23 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+
+# credenciais - NUNCA commitar
+service-account*.json
+.env
+
+# ---------------------------------------------------------------------
+# Dados reais de servidores públicos (fixtures de teste) - NUNCA commitar.
+# O PDF tem nomes individuais (seção "Servidores Afastados") e os JSONs
+# têm valores financeiros reais da secretaria. Guarde-os localmente fora
+# do git; os testes que dependem deles (tests/test_parser_com_pdf_real.py)
+# são pulados automaticamente quando esses arquivos não existem.
+# ---------------------------------------------------------------------
+backend/fixtures/relatorio_julho_2026.pdf
+backend/fixtures/ground_truth_julho_2026.json
+backend/fixtures/instituicoes_consignacoes.json
+
+.DS_Store

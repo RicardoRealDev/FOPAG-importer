@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Importar PDF · Planilha FOPAG</title>
+<style>
+  :root { --azul: #1F4E78; --azul-claro: #E8F0FE; --dourado: #C98500; --verde: #188038; --vermelho: #C5221F; --cinza: #5f6368; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, Segoe UI, Arial, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; color: #202124; }
+  h1 { font-size: 22px; color: var(--azul); margin-bottom: 4px; }
+  p.sub { color: var(--cinza); margin-top: 0; }
+
+  #dropzone {
+    border: 3px dashed #9aa0a6; border-radius: 12px; padding: 48px 20px;
+    text-align: center; cursor: pointer; transition: all .15s; margin: 24px 0;
+  }
+  #dropzone.arrastando { border-color: var(--azul); background: var(--azul-claro); }
+  #dropzone svg { width: 48px; height: 48px; color: var(--azul); margin-bottom: 8px; }
+  #dropzone .titulo { font-size: 17px; font-weight: 600; }
+  #dropzone .detalhe { color: var(--cinza); font-size: 13px; margin-top: 4px; }
+  input[type=file] { display: none; }
+
+  #status { text-align: center; padding: 24px; color: var(--cinza); display: none; }
+  .spinner { width: 28px; height: 28px; border: 3px solid #e0e0e0; border-top-color: var(--azul); border-radius: 50%; animation: girar 0.8s linear infinite; margin: 0 auto 10px; }
+  @keyframes girar { to { transform: rotate(360deg); } }
+
+  #resultado { display: none; }
+  .card-resumo { background: var(--azul-claro); border-radius: 10px; padding: 16px 20px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+  .card-resumo .n { font-size: 28px; font-weight: bold; color: var(--azul); }
+  .card-resumo .label { color: var(--cinza); font-size: 13px; }
+
+  details { border: 1px solid #dadce0; border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
+  summary { padding: 10px 14px; cursor: pointer; font-weight: 600; background: #f8f9fa; }
+  .item { display: flex; justify-content: space-between; padding: 8px 14px; border-top: 1px solid #eee; font-size: 13px; }
+  .item .origem { color: var(--cinza); flex: 1; }
+  .item .valor { font-weight: 600; white-space: nowrap; margin-left: 12px; }
+  .badge { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 10px; margin-left: 6px; }
+  .badge.alta { background: #e6f4ea; color: var(--verde); }
+  .badge.media { background: #fef7e0; color: var(--dourado); }
+  .badge.baixa { background: #fce8e6; color: var(--vermelho); }
+
+  #avisos { background: #fef7e0; border-radius: 8px; padding: 12px 16px; font-size: 13px; color: #7A5900; margin-top: 16px; display: none; }
+
+  #acoes { display: flex; gap: 10px; margin-top: 20px; }
+  button { font-size: 15px; padding: 12px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; }
+  #btnAplicar { background: var(--azul); color: white; flex: 1; }
+  #btnAplicar:disabled { background: #9aa0a6; cursor: default; }
+  #btnCancelar { background: #f1f3f4; color: #202124; }
+
+  #sucesso { display: none; text-align: center; padding: 30px 0; }
+  #sucesso .icone { font-size: 48px; }
+  #sucesso h2 { color: var(--verde); }
+
+  #erro { display: none; background: #fce8e6; color: var(--vermelho); padding: 14px 18px; border-radius: 8px; margin-top: 16px; }
+</style>
+</head>
+<body>
+
+<h1>Importar PDF da FOPAG</h1>
+<p class="sub">Arraste o relatório do Ergon aqui. Nada é gravado na planilha até você conferir e confirmar.</p>
+
+<div id="dropzone">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 16V4m0 0L7 9m5-5l5 5M5 20h14" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <div class="titulo">Clique ou arraste o PDF aqui</div>
+  <div class="detalhe">Relatório do Ergon (Resumo de Crédito Bancário / Consignações / Encargos Sociais)</div>
+  <input type="file" id="arquivo" accept="application/pdf" />
+</div>
+
+<div id="status">
+  <div class="spinner"></div>
+  <div id="statusTexto">Lendo o PDF…</div>
+</div>
+
+<div id="erro"></div>
+
+<div id="resultado">
+  <div class="card-resumo">
+    <div>
+      <div class="label">Valores encontrados no PDF</div>
+      <div class="n" id="totalEncontrado">0</div>
+    </div>
+  </div>
+
+  <div id="secoes"></div>
+
+  <div id="avisos"></div>
+
+  <div id="acoes">
+    <button id="btnCancelar" onclick="reiniciar()">Cancelar</button>
+    <button id="btnAplicar" onclick="aplicar()">Gravar na planilha</button>
+  </div>
+</div>
+
+<div id="sucesso">
+  <div class="icone">✅</div>
+  <h2 id="sucessoTitulo">Planilha atualizada</h2>
+  <p id="sucessoDetalhe" class="sub"></p>
+  <button onclick="reiniciar()">Importar outro PDF</button>
+</div>
+
+<script>
+// ATENÇÃO: troque pela URL da sua Cloud Function depois do deploy
+// (veja README.md - "Configurar o frontend").
+const API_URL = "https://southamerica-east1-fopag-504513.cloudfunctions.net/fopag-importar-pdf";
+const SPREADSHEET_ID = "17wR5siNAMMTo40CPc7_ujXyAdNQZOs2TfzcQnn6YA1c";
+
+const dropzone = document.getElementById("dropzone");
+const inputArquivo = document.getElementById("arquivo");
+let ultimosItens = [];
+
+dropzone.addEventListener("click", () => inputArquivo.click());
+dropzone.addEventListener("dragover", (e) => { e.preventDefault(); dropzone.classList.add("arrastando"); });
+dropzone.addEventListener("dragleave", () => dropzone.classList.remove("arrastando"));
+dropzone.addEventListener("drop", (e) => {
+  e.preventDefault();
+  dropzone.classList.remove("arrastando");
+  if (e.dataTransfer.files.length) enviarPdf(e.dataTransfer.files[0]);
+});
+inputArquivo.addEventListener("change", (e) => {
+  if (e.target.files.length) enviarPdf(e.target.files[0]);
+});
+
+function mostrar(id) {
+  ["dropzone", "status", "resultado", "sucesso", "erro"].forEach((s) => {
+    document.getElementById(s).style.display = "none";
+  });
+  document.getElementById(id).style.display = id === "acoes" ? "flex" : (id === "status" ? "block" : "block");
+}
+
+function mostrarErro(msg) {
+  mostrar("erro");
+  document.getElementById("erro").style.display = "block";
+  document.getElementById("erro").textContent = msg;
+  document.getElementById("dropzone").style.display = "block";
+}
+
+async function enviarPdf(arquivo) {
+  mostrar("status");
+  document.getElementById("statusTexto").textContent = "Lendo o PDF…";
+
+  const form = new FormData();
+  form.append("pdf", arquivo);
+  form.append("spreadsheet_id", SPREADSHEET_ID);
+  form.append("modo", "revisar");
+
+  try {
+    const resp = await fetch(API_URL, { method: "POST", body: form });
+    const dados = await resp.json();
+    if (!resp.ok) throw new Error(dados.erro || "Erro ao processar o PDF.");
+    mostrarResultado(dados);
+  } catch (err) {
+    mostrarErro("Não consegui processar: " + err.message);
+  }
+}
+
+function agruparPorAba(itens) {
+  const grupos = {};
+  itens.forEach((it) => {
+    grupos[it.aba] = grupos[it.aba] || [];
+    grupos[it.aba].push(it);
+  });
+  return grupos;
+}
+
+function mostrarResultado(dados) {
+  ultimosItens = dados.itens;
+  document.getElementById("totalEncontrado").textContent = dados.total_encontrado;
+
+  const secoes = document.getElementById("secoes");
+  secoes.innerHTML = "";
+  const grupos = agruparPorAba(dados.itens);
+  Object.entries(grupos).forEach(([aba, itens]) => {
+    const det = document.createElement("details");
+    det.open = false;
+    const sum = document.createElement("summary");
+    sum.textContent = `${aba} (${itens.length})`;
+    det.appendChild(sum);
+    itens.forEach((it) => {
+      const row = document.createElement("div");
+      row.className = "item";
+      row.innerHTML = `<span class="origem">${it.celula} — ${it.origem}</span>` +
+        `<span class="valor">R$ ${it.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` +
+        `<span class="badge ${it.confianca}">${it.confianca}</span></span>`;
+      det.appendChild(row);
+    });
+    secoes.appendChild(det);
+  });
+
+  const avisosEl = document.getElementById("avisos");
+  if (dados.avisos && dados.avisos.length) {
+    avisosEl.style.display = "block";
+    avisosEl.innerHTML = "<b>Avisos:</b><br>" + dados.avisos.map((a) => "• " + a).join("<br>");
+  } else {
+    avisosEl.style.display = "none";
+  }
+
+  document.getElementById("resultado").style.display = "block";
+  document.getElementById("status").style.display = "none";
+  document.getElementById("dropzone").style.display = "none";
+}
+
+async function aplicar() {
+  const btn = document.getElementById("btnAplicar");
+  btn.disabled = true;
+  btn.textContent = "Gravando…";
+
+  const form = new FormData();
+  form.append("spreadsheet_id", SPREADSHEET_ID);
+  form.append("modo", "aplicar");
+  form.append("pdf", inputArquivo.files[0]);
+
+  try {
+    const resp = await fetch(API_URL, { method: "POST", body: form });
+    const dados = await resp.json();
+    if (!resp.ok) throw new Error(dados.erro || "Erro ao gravar.");
+
+    document.getElementById("resultado").style.display = "none";
+    document.getElementById("sucesso").style.display = "block";
+    document.getElementById("sucessoDetalhe").textContent =
+      `${dados.total_aplicado} valores atualizados na planilha.` +
+      (dados.nao_aplicados_baixa_confianca.length
+        ? ` ${dados.nao_aplicados_baixa_confianca.length} ficaram de fora por baixa confiança — confira manualmente.`
+        : "");
+  } catch (err) {
+    mostrarErro("Não consegui gravar: " + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Gravar na planilha";
+  }
+}
+
+function reiniciar() {
+  inputArquivo.value = "";
+  document.getElementById("dropzone").style.display = "block";
+  document.getElementById("resultado").style.display = "none";
+  document.getElementById("sucesso").style.display = "none";
+  document.getElementById("erro").style.display = "none";
+}
+</script>
+</body>
+</html>

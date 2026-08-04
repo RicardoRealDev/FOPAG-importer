@@ -1,0 +1,42 @@
+name: Deploy da Cloud Function
+
+# So' roda depois que os testes passam (ver test.yml) e so' quando algo em
+# backend/ muda na branch main - protege contra publicar codigo quebrado.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write   # necessario para autenticacao via Workload Identity Federation
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instala dependências e roda testes (não publica se falhar)
+        working-directory: backend
+        run: |
+          pip install -r requirements-dev.txt
+          pytest -v
+
+      - name: Autentica no Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Publica a Cloud Function
+        uses: google-github-actions/deploy-cloud-functions@v3
+        with:
+          name: fopag-importar-pdf
+          runtime: python312
+          region: southamerica-east1
+          source_dir: backend
+          entry_point: importar_pdf
+          service_account: ${{ secrets.GCP_FUNCTION_SERVICE_ACCOUNT }}
+          env_vars: |
+            ALLOWED_ORIGIN=${{ vars.ALLOWED_ORIGIN }}
+            DEFAULT_SPREADSHEET_ID=${{ secrets.DEFAULT_SPREADSHEET_ID }}
