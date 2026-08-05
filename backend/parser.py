@@ -73,6 +73,31 @@ def find_best_match(nome_pdf: str, candidatos: dict[str, str], limiar: float = 0
 
 
 # ---------------------------------------------------------------------------
+# Mês/ano do relatório -> corrige os títulos da planilha automaticamente
+# ---------------------------------------------------------------------------
+MESES_PT = ["JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO",
+            "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"]
+MES_ANO_RELATORIO_RE = re.compile(r"M[êe]s/Ano\s*-\s*Folha:\s*(\d{2})/(\d{4})")
+
+
+def extrair_mes_ano(pages: list[str]) -> str | None:
+    """Lê o padrão 'Mês/Ano - Folha: MM/AAAA' que aparece em toda página do
+    relatório do Ergon e devolve o rótulo em português, ex: 'JULHO DE 2026'.
+    Usado pra corrigir automaticamente títulos desatualizados na planilha
+    (ex: uma aba que ainda diz 'MAIO/2026' num mês de julho, porque o
+    arquivo original foi reaproveitado de um mês anterior sem atualizar)."""
+    texto = "\n".join(pages)
+    m = MES_ANO_RELATORIO_RE.search(texto)
+    if not m:
+        return None
+    mes_num = int(m.group(1))
+    ano = m.group(2)
+    if not (1 <= mes_num <= 12):
+        return None
+    return f"{MESES_PT[mes_num - 1]} DE {ano}"
+
+
+# ---------------------------------------------------------------------------
 # 1) RESUMO DE CRÉDITO BANCÁRIO -> totais líquidos por regime
 # ---------------------------------------------------------------------------
 CREDITO_BANCARIO_ANCHOR = "RESUMO DE CRÉDITO BANCÁRIO"

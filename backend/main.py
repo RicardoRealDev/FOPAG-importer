@@ -55,10 +55,11 @@ def _processar(pdf_bytes: bytes, spreadsheet_id: str) -> dict:
     r1 = p.parse_credito_bancario(pages)
     r2 = p.parse_consignacoes(pages, instituicoes)
     r3 = p.parse_encargos(pages)
+    mes_ano_label = p.extrair_mes_ano(pages)
 
     achados = r1.achados + r2.achados + r3.achados
     avisos = r1.avisos + r2.avisos + r3.avisos
-    return {"achados": achados, "avisos": avisos}
+    return {"achados": achados, "avisos": avisos, "mes_ano_label": mes_ano_label}
 
 
 @functions_framework.http
@@ -101,7 +102,9 @@ def importar_pdf(request: Request):
     # modo == "gerar_arquivo": gera um .xlsx preenchido a partir do modelo,
     # em vez de escrever ao vivo via Google Sheets API - mais simples, sem
     # CORS/timeout de escrita.
-    xlsx_bytes, total_aplicado, nao_encontrados = xlsx_writer.gerar_xlsx(achados)
+    xlsx_bytes, total_aplicado, nao_encontrados = xlsx_writer.gerar_xlsx(
+        achados, mes_ano_label=resultado.get("mes_ano_label")
+    )
     baixa_confianca = [a for a in achados if a.confianca == "baixa"]
 
     headers = _cors_headers()
