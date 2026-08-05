@@ -67,6 +67,18 @@ def gerar_xlsx(achados: list[Achado], mes_ano_label: str | None = None,
     sobrescritos."""
     wb = openpyxl.load_workbook(TEMPLATE_PATH, data_only=False)
 
+    # Zera antes de preencher: evita que uma célula que o mês novo não
+    # mencionou (ex: nenhuma consignação daquele banco esse mês) fique com
+    # o valor de julho ainda no arquivo. So' zera o que este sistema e'
+    # responsavel por preencher - o resto (rubrica-por-rubrica, IRRF, NES)
+    # fica intocado.
+    for sheet_name, cells in config.celulas_gerenciadas().items():
+        if sheet_name not in wb.sheetnames:
+            continue
+        ws = wb[sheet_name]
+        for cell in cells:
+            ws[cell] = 0
+
     aplicaveis = [a for a in achados if (not apenas_alta_e_media or a.confianca in ("alta", "media"))]
 
     nao_encontrados = []
