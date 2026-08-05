@@ -2,9 +2,9 @@
 Ponto de entrada HTTP (Google Cloud Functions / Cloud Run).
 
 Endpoint único: recebe um PDF, devolve o que encontrou (modo "revisar")
-ou já grava na planilha (modo "aplicar"). Fino de propósito: toda a lógica
-de verdade mora em parser.py e sheet_writer.py - este arquivo só faz a
-"cola" HTTP (parse do request, CORS, resposta JSON).
+ou gera um .xlsx preenchido pra download (qualquer outro modo). Fino de
+propósito: toda a lógica de verdade mora em parser.py e xlsx_writer.py -
+este arquivo só faz a "cola" HTTP (parse do request, CORS, resposta).
 """
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ import config
 import parser as p
 import pdf_extract
 import sheet_writer
+import xlsx_writer
 
 ALLOWED_ORIGIN = os.environ.get("ALLOWED_ORIGIN", "*")
 
@@ -75,7 +76,7 @@ def importar_pdf(request: Request):
     if not spreadsheet_id:
         return jsonify({"erro": "Informe spreadsheet_id."}), 400, _cors_headers()
 
-    modo = request.form.get("modo", "revisar")  # "revisar" | "aplicar"
+    modo = request.form.get("modo", "revisar")  # "revisar" | qualquer outro = gerar arquivo
 
     pdf_bytes = request.files["pdf"].read()
 
@@ -97,23 +98,17 @@ def importar_pdf(request: Request):
             "avisos": resultado["avisos"],
         }), 200, _cors_headers()
 
-    aplicados = sheet_writer.aplicar(spreadsheet_id, achados)
+    # modo == "gerar_arquivo": gera um .xlsx preenchido a partir do modelo,
+    # em vez de escrever ao vivo via Google Sheets API - mais simples, sem
+    # CORS/timeout de escrita.
+    xlsx_bytes, total_aplicado, nao_encontrados = xlsx_writer.gerar_xlsx(achados)
     baixa_confianca = [a for a in achados if a.confianca == "baixa"]
 
-    return jsonify({
-        "modo": "aplicar",
-        "total_aplicado": len(aplicados),
-        "itens": [
-            {
-                "aba": item.sheet, "celula": item.cell,
-                "valor_novo": item.valor_novo, "valor_anterior": item.valor_anterior,
-                "origem": item.origem, "confianca": item.confianca,
-            }
-            for item in aplicados
-        ],
-        "nao_aplicados_baixa_confianca": [
-            {"aba": a.sheet, "celula": a.cell, "valor": a.valor, "origem": a.origem}
-            for a in baixa_confianca
-        ],
-        "avisos": resultado["avisos"],
-    }), 200, _cors_headers()
+    headers = _cors_headers()
+    headers["Content-Type"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    headers["Content-Disposition"] = 'attachment; filename="Planilha FOPAG preenchida.xlsx"'
+    headers["X-Total-Aplicado"] = str(total_aplicado)
+    headers["X-Nao-Encontrados"] = str(len(nao_encontrados))
+    headers["X-Baixa-Confianca"] = str(len(baixa_confianca))
+    headers["Access-Control-Expose-Headers"] = "X-Total-Aplicado, X-Nao-Encontrados, X-Baixa-Confianca"
+    return xlsx_bytes, 200, headers

@@ -3,3 +3,4 @@ flask==3.*
 pymupdf==1.24.*
 google-api-python-client==2.*
 google-auth==2.*
+openpyxl==3.*
