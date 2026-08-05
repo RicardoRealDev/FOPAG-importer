@@ -169,8 +169,15 @@
   .hero { position: relative; z-index: 1; text-align: center; padding-bottom: 40px; }
   .brand { display: flex; flex-direction: column; align-items: center; gap: 12px; }
   .eyebrow { margin: 0; color: hsl(var(--primary)); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; }
-  h1 { margin: 0; font-family: var(--font-display); font-size: 1.875rem; font-weight: 600; letter-spacing: -0.01em; }
-  h1 .script { font-family: var(--font-script); font-weight: 700; font-size: 1.35em; color: hsl(var(--primary)); letter-spacing: 0; }
+  h1 {
+    margin: 0; display: flex; align-items: baseline; justify-content: center; flex-wrap: wrap; gap: .5em;
+    font-family: var(--font-display); font-size: 1.875rem; font-weight: 600; letter-spacing: -0.01em;
+  }
+  h1 .script { font-family: var(--font-script); font-weight: 700; font-size: 1.5em; color: hsl(var(--primary)); letter-spacing: 0; line-height: 1; }
+  h1 .brand-suffix {
+    font-family: var(--font-sans); font-size: 0.58em; font-weight: 700;
+    letter-spacing: 0.16em; text-transform: uppercase; color: hsl(var(--foreground) / .78);
+  }
   .sub { margin: 0; color: hsl(var(--muted-foreground)); font-size: 0.9375rem; max-width: 480px; line-height: 1.5; }
 
   .card {
@@ -297,7 +304,7 @@
   <header class="hero">
     <div class="brand">
       <p class="eyebrow">Governo do Estado do Tocantins · Secretaria de Desenvolvimento das Regiões Metropolitanas</p>
-      <h1><span class="script">Importar</span> PDF · FOPAG</h1>
+      <h1><span class="script">Importar</span><span class="brand-suffix">PDF · FOPAG</span></h1>
       <p class="sub">Arraste o relatório do Ergon aqui. Nada é gravado na planilha até você conferir e baixar o arquivo.</p>
     </div>
   </header>
