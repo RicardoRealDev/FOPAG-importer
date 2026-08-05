@@ -100,14 +100,13 @@
 </div>
 
 <script>
-// ATENÇÃO: troque pela URL da sua Cloud Function depois do deploy
-// (veja README.md - "Configurar o frontend").
 const API_URL = "https://southamerica-east1-fopag-504513.cloudfunctions.net/fopag-importar-pdf";
 const SPREADSHEET_ID = "17wR5siNAMMTo40CPc7_ujXyAdNQZOs2TfzcQnn6YA1c";
 
 const dropzone = document.getElementById("dropzone");
 const inputArquivo = document.getElementById("arquivo");
 let ultimosItens = [];
+let arquivoAtual = null;   // guarda o PDF tanto se veio de clique quanto de arrastar
 
 dropzone.addEventListener("click", () => inputArquivo.click());
 dropzone.addEventListener("dragover", (e) => { e.preventDefault(); dropzone.classList.add("arrastando"); });
@@ -136,6 +135,7 @@ function mostrarErro(msg) {
 }
 
 async function enviarPdf(arquivo) {
+  arquivoAtual = arquivo;
   mostrar("status");
   document.getElementById("statusTexto").textContent = "Lendo o PDF…";
 
@@ -208,7 +208,7 @@ async function aplicar() {
   const form = new FormData();
   form.append("spreadsheet_id", SPREADSHEET_ID);
   form.append("modo", "aplicar");
-  form.append("pdf", inputArquivo.files[0]);
+  form.append("pdf", arquivoAtual);
 
   try {
     const resp = await fetch(API_URL, { method: "POST", body: form });
@@ -231,6 +231,7 @@ async function aplicar() {
 }
 
 function reiniciar() {
+  arquivoAtual = null;
   inputArquivo.value = "";
   document.getElementById("dropzone").style.display = "block";
   document.getElementById("resultado").style.display = "none";
