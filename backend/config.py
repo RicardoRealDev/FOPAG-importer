@@ -73,3 +73,32 @@ ENCARGOS_SECTION_TITLE = "ENCARGOS SOCIAIS - GERAL"
 # Registro de origem por celula (auditoria: de onde veio cada numero)
 # ---------------------------------------------------------------------------
 SOURCE_LABEL = "Importado automaticamente do relatório Ergon"
+
+
+def celulas_gerenciadas() -> dict[str, list[str]]:
+    """Todas as células que este sistema é responsável por preencher (ou
+    seja: onde um Achado PODE cair). Usado pra zerar essas células antes de
+    escrever um novo mês - assim, se o PDF de um mês não trouxer dado pra
+    alguma delas (ex: nenhum Contrato Temporário naquele mês), a célula vira
+    0 de verdade em vez de continuar com o valor do mês anterior.
+
+    NÃO inclui as células que o sistema ainda não sabe preencher sozinho
+    (detalhamento rubrica-por-rubrica, IRRF, NES) - essas continuam manuais
+    e não são tocadas aqui."""
+    celulas: dict[str, set[str]] = {}
+
+    def add(sheet, cell):
+        celulas.setdefault(sheet, set()).add(cell)
+
+    for destino in CREDITO_BANCARIO_REGIMES.values():
+        add(SHEET_LIQUIDO, destino["liquido_total_cell"])
+        add(SHEET_CONSIGNACOES, destino["consignacoes_resumo_cell"])
+
+    for cell in ENCARGOS_FUNDO_TO_CELL.values():
+        add(SHEET_LIQUIDO, cell)
+
+    for col in set(CONSIGNACOES_REGIME_TO_COLUMN.values()):
+        for row in range(CONSIGNACOES_ROW_START, CONSIGNACOES_ROW_END + 1):
+            add(SHEET_CONSIGNACOES, f"{col}{row}")
+
+    return {sheet: sorted(cells) for sheet, cells in celulas.items()}
