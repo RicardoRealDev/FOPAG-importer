@@ -8,14 +8,14 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='5.5' fill='%23F2A90D'/%3E%3C/svg%3E" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Dancing+Script:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <script>
   // define o tema antes do CSS pintar a pagina, pra nao "piscar" o tema errado
+  // padrao e' sempre claro, independente da preferencia do sistema
   (function () {
     try {
       var salvo = localStorage.getItem("fopag-tema");
-      var tema = salvo || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-      document.documentElement.setAttribute("data-theme", tema);
+      document.documentElement.setAttribute("data-theme", salvo || "light");
     } catch (e) {}
   })();
 </script>
@@ -46,7 +46,6 @@
     --radius: 0.85rem;
     --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     --font-display: "Fraunces", Georgia, "Times New Roman", serif;
-    --font-script: "Dancing Script", cursive;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -170,13 +169,8 @@
   .brand { display: flex; flex-direction: column; align-items: center; gap: 12px; }
   .eyebrow { margin: 0; color: hsl(var(--primary)); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; }
   h1 {
-    margin: 0; display: flex; align-items: baseline; justify-content: center; flex-wrap: wrap; gap: .5em;
-    font-family: var(--font-display); font-size: 1.875rem; font-weight: 600; letter-spacing: -0.01em;
-  }
-  h1 .script { font-family: var(--font-script); font-weight: 700; font-size: 1.5em; color: hsl(var(--primary)); letter-spacing: 0; line-height: 1; }
-  h1 .brand-suffix {
-    font-family: var(--font-sans); font-size: 0.58em; font-weight: 700;
-    letter-spacing: 0.16em; text-transform: uppercase; color: hsl(var(--foreground) / .78);
+    margin: 0; font-family: var(--font-sans); font-size: 1.75rem; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; color: hsl(var(--foreground));
   }
   .sub { margin: 0; color: hsl(var(--muted-foreground)); font-size: 0.9375rem; max-width: 480px; line-height: 1.5; }
 
@@ -304,22 +298,22 @@
   <header class="hero">
     <div class="brand">
       <p class="eyebrow">Governo do Estado do Tocantins · Secretaria de Desenvolvimento das Regiões Metropolitanas</p>
-      <h1><span class="script">Importar</span><span class="brand-suffix">FLOPAGEAR</span></h1>
-      <p class="sub">Arraste o relatório do Ergon aqui. Nada é gravado na planilha até você conferir e baixar o arquivo.</p>
+      <h1>FLOPAGEAR</h1>
+      <p class="sub">Envie o relatório do Ergon para iniciar a leitura automática dos dados. Nenhuma informação é gravada até a conferência e o download do arquivo.</p>
     </div>
   </header>
 
   <div class="card">
     <div id="dropzone">
       <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 16V4m0 0L7 9m5-5l5 5M5 20h14" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <div class="titulo">Clique ou arraste o PDF aqui</div>
+      <div class="titulo">Clique ou arraste o arquivo PDF</div>
       <div class="detalhe">Relatório do Ergon — Crédito Bancário, Consignações, Encargos Sociais e Rendimentos</div>
       <input type="file" id="arquivo" accept="application/pdf" />
     </div>
 
     <div id="status">
       <div class="spinner"></div>
-      <p id="statusTexto">Lendo o PDF…</p>
+      <p id="statusTexto">Processando o arquivo…</p>
     </div>
 
     <div id="erro" class="alert destructive" role="alert">
@@ -330,7 +324,7 @@
     <div id="resultado">
       <div class="stat">
         <div>
-          <div class="label">Valores encontrados no PDF</div>
+          <div class="label">Valores identificados no documento</div>
           <div class="n" id="totalEncontrado">0</div>
         </div>
       </div>
@@ -366,9 +360,9 @@
 
     <div id="sucesso">
       <div class="icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <h2 id="sucessoTitulo">Planilha gerada</h2>
+      <h2 id="sucessoTitulo">Planilha gerada com sucesso</h2>
       <p id="sucessoDetalhe"></p>
-      <button type="button" onclick="reiniciar()">Importar outro PDF</button>
+      <button type="button" onclick="reiniciar()">Importar outro relatório</button>
     </div>
   </div>
 
@@ -422,13 +416,13 @@ function ehPdf(arquivo) {
 
 async function enviarPdf(arquivo) {
   if (!ehPdf(arquivo)) {
-    mostrarErro(`"${arquivo.name}" não é um PDF. Envie o relatório exportado do Ergon em formato PDF.`);
+    mostrarErro(`O arquivo "${arquivo.name}" não está em formato PDF. Envie o relatório exportado do sistema Ergon nesse formato.`);
     return;
   }
   arquivoAtual = arquivo;
   ocultarTodos();
   document.getElementById("status").style.display = DISPLAY.status;
-  document.getElementById("statusTexto").textContent = "Lendo o PDF…";
+  document.getElementById("statusTexto").textContent = "Processando o arquivo…";
 
   const form = new FormData();
   form.append("pdf", arquivo);
@@ -438,10 +432,10 @@ async function enviarPdf(arquivo) {
   try {
     const resp = await fetch(API_URL, { method: "POST", body: form });
     const dados = await resp.json();
-    if (!resp.ok) throw new Error(dados.erro || "Erro ao processar o PDF.");
+    if (!resp.ok) throw new Error(dados.erro || "Ocorreu um erro ao processar o arquivo.");
     mostrarResultado(dados);
   } catch (err) {
-    mostrarErro("Não consegui processar: " + err.message);
+    mostrarErro("Não foi possível processar o arquivo: " + err.message);
   }
 }
 
@@ -461,7 +455,7 @@ function mostrarResultado(dados) {
   const mesEl = document.getElementById("mesDetectado");
   if (dados.mes_ano_label) {
     mesEl.style.display = "inline-flex";
-    document.getElementById("mesDetectadoTexto").textContent = `Detectado no PDF: ${dados.mes_ano_label}`;
+    document.getElementById("mesDetectadoTexto").textContent = `Período identificado no documento: ${dados.mes_ano_label}`;
   } else {
     mesEl.style.display = "none";
   }
@@ -500,7 +494,7 @@ function mostrarResultado(dados) {
   const naoMapEl = document.getElementById("naoMapeados");
   if (dados.nao_mapeados && dados.nao_mapeados.length) {
     naoMapEl.style.display = "flex";
-    const intro = `<div style="margin-bottom:4px">${dados.nao_mapeados.length} item(ns) ainda sem linha certa na planilha — vão para uma área separada no arquivo baixado, para você revisar e lançar manualmente:</div>`;
+    const intro = `<div style="margin-bottom:4px">${dados.nao_mapeados.length} item(ns) não possuem correspondência automática na planilha. Esses itens serão listados em uma área separada do arquivo gerado para conferência e lançamento manual:</div>`;
     const linhas = dados.nao_mapeados.map((it) =>
       `<div>• ${it.regime} — ${it.codigo} ${it.descricao}: R$ ${it.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</div>`
     ).join("");
@@ -527,7 +521,7 @@ async function aplicar() {
     const resp = await fetch(API_URL, { method: "POST", body: form });
     if (!resp.ok) {
       const dados = await resp.json().catch(() => ({}));
-      throw new Error(dados.erro || "Erro ao gerar o arquivo.");
+      throw new Error(dados.erro || "Ocorreu um erro ao gerar o arquivo.");
     }
 
     const totalAplicado = resp.headers.get("X-Total-Aplicado") || "?";
@@ -546,13 +540,13 @@ async function aplicar() {
     ocultarTodos();
     document.getElementById("sucesso").style.display = DISPLAY.sucesso;
     document.getElementById("sucessoDetalhe").textContent =
-      `${totalAplicado} valores preenchidos no arquivo baixado.` +
+      `${totalAplicado} valores foram preenchidos automaticamente no arquivo baixado.` +
       (baixaConfianca
-        ? ` ${baixaConfianca} ficaram de fora por baixa confiança — preencha manualmente.`
+        ? ` ${baixaConfianca} item(ns) não foram preenchidos por apresentarem baixa confiança e devem ser lançados manualmente.`
         : "") +
-      ` Agora é só substituir no Google Sheets (Arquivo > Importar > Fazer upload > Substituir planilha).`;
+      ` Para concluir, substitua a planilha atual no Google Sheets (Arquivo > Importar > Fazer upload > Substituir planilha).`;
   } catch (err) {
-    mostrarErro("Não consegui gerar o arquivo: " + err.message);
+    mostrarErro("Não foi possível gerar o arquivo: " + err.message);
   } finally {
     btn.disabled = false;
     btn.textContent = "Baixar planilha preenchida";
