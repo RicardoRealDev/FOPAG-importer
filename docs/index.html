@@ -6,6 +6,19 @@
 <meta name="theme-color" content="#F2A90D" />
 <title>Importar PDF · Planilha FOPAG</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='5.5' fill='%23F2A90D'/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Dancing+Script:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script>
+  // define o tema antes do CSS pintar a pagina, pra nao "piscar" o tema errado
+  (function () {
+    try {
+      var salvo = localStorage.getItem("fopag-tema");
+      var tema = salvo || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      document.documentElement.setAttribute("data-theme", tema);
+    } catch (e) {}
+  })();
+</script>
 <style>
   :root {
     --background: 40 40% 98%;
@@ -31,6 +44,9 @@
     --info-bg: 213 70% 95%;
     --info-foreground: 213 70% 28%;
     --radius: 0.85rem;
+    --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+    --font-script: "Dancing Script", cursive;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -59,16 +75,68 @@
     }
   }
 
+  /* Sobrescreve o tema automatico quando o usuario escolhe manualmente
+     (via #btnTema) - especificidade de atributo vence a media query,
+     entao funciona mesmo se o sistema estiver no modo oposto. */
+  :root[data-theme="light"] {
+    --background: 40 40% 98%;
+    --foreground: 240 10% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 12%;
+    --muted: 40 24% 95%;
+    --muted-foreground: 240 5% 42%;
+    --border: 240 8% 89%;
+    --ring: 38 92% 50%;
+    --primary: 38 92% 50%;
+    --primary-foreground: 30 45% 12%;
+    --secondary: 213 94% 32%;
+    --success: 142 71% 30%;
+    --success-bg: 142 55% 94%;
+    --warning: 32 90% 40%;
+    --warning-bg: 42 96% 93%;
+    --warning-foreground: 30 60% 25%;
+    --destructive: 0 72% 45%;
+    --destructive-bg: 0 70% 96%;
+    --destructive-foreground: 0 60% 32%;
+    --info: 213 80% 40%;
+    --info-bg: 213 70% 95%;
+    --info-foreground: 213 70% 28%;
+  }
+  :root[data-theme="dark"] {
+    --background: 240 10% 6%;
+    --foreground: 0 0% 95%;
+    --card: 240 8% 9%;
+    --card-foreground: 0 0% 95%;
+    --muted: 240 6% 14%;
+    --muted-foreground: 240 5% 65%;
+    --border: 240 6% 19%;
+    --ring: 38 92% 55%;
+    --primary: 38 92% 55%;
+    --primary-foreground: 30 45% 10%;
+    --secondary: 213 80% 58%;
+    --success: 142 55% 48%;
+    --success-bg: 142 40% 14%;
+    --warning: 38 92% 58%;
+    --warning-bg: 40 55% 16%;
+    --warning-foreground: 42 90% 82%;
+    --destructive: 0 70% 58%;
+    --destructive-bg: 0 45% 16%;
+    --destructive-foreground: 0 80% 88%;
+    --info: 213 80% 62%;
+    --info-bg: 213 45% 15%;
+    --info-foreground: 213 80% 85%;
+  }
+
   * { box-sizing: border-box; }
   html, body { height: 100%; }
   body {
     margin: 0;
-    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-family: var(--font-sans);
     background: hsl(var(--background));
     color: hsl(var(--foreground));
     -webkit-font-smoothing: antialiased;
   }
-  .page { max-width: 640px; margin: 0 auto; padding: 56px 20px 48px; }
+  .page { max-width: 880px; margin: 0 auto; padding: 64px 32px 64px; }
 
   .corner-glow {
     position: fixed; width: 460px; height: 460px; border-radius: 50%;
@@ -78,28 +146,40 @@
   .corner-glow-tl { top: -200px; left: -200px; }
   .corner-glow-tr { top: -200px; right: -200px; }
 
-  .hero { position: relative; z-index: 1; text-align: center; padding-bottom: 26px; }
-  .brand { display: flex; flex-direction: column; align-items: center; gap: 10px; }
-  .sun-mark { width: 38px; height: 38px; color: hsl(var(--primary)); }
-  h1 { margin: 0; font-size: 1.375rem; font-weight: 650; letter-spacing: -0.01em; }
-  .sub { margin: 0; color: hsl(var(--muted-foreground)); font-size: 0.875rem; max-width: 420px; line-height: 1.45; }
+  #btnTema {
+    position: fixed; top: 16px; right: 16px; z-index: 2;
+    width: 36px; height: 36px; padding: 0; border-radius: 999px;
+    background: hsl(var(--card)); border: 1px solid hsl(var(--border)); color: hsl(var(--foreground));
+  }
+  #btnTema:hover { background: hsl(var(--muted)); }
+  #btnTema svg { width: 17px; height: 17px; }
+  #btnTema .icone-lua { display: none; }
+  :root[data-theme="dark"] #btnTema .icone-sol { display: none; }
+  :root[data-theme="dark"] #btnTema .icone-lua { display: block; }
+
+  .hero { position: relative; z-index: 1; text-align: center; padding-bottom: 40px; }
+  .brand { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .eyebrow { margin: 0; color: hsl(var(--primary)); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; }
+  h1 { margin: 0; font-family: var(--font-display); font-size: 1.875rem; font-weight: 600; letter-spacing: -0.01em; }
+  h1 .script { font-family: var(--font-script); font-weight: 700; font-size: 1.35em; color: hsl(var(--primary)); letter-spacing: 0; }
+  .sub { margin: 0; color: hsl(var(--muted-foreground)); font-size: 0.9375rem; max-width: 480px; line-height: 1.5; }
 
   .card {
     position: relative; z-index: 1;
     background: hsl(var(--card)); color: hsl(var(--card-foreground));
     border: 1px solid hsl(var(--border)); border-radius: var(--radius);
-    padding: 24px; box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.04);
+    padding: 36px; box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.04);
   }
 
   #dropzone {
     border: 1.5px dashed hsl(var(--border)); border-radius: calc(var(--radius) - 6px);
-    padding: 44px 20px; text-align: center; cursor: pointer;
+    padding: 60px 24px; text-align: center; cursor: pointer;
     transition: border-color .15s, background-color .15s;
   }
   #dropzone:hover { border-color: hsl(var(--primary) / .55); background: hsl(var(--muted) / .5); }
   #dropzone.arrastando { border-color: hsl(var(--primary)); background: hsl(var(--primary) / .08); }
   #dropzone svg.icon { width: 34px; height: 34px; color: hsl(var(--primary)); margin-bottom: 10px; }
-  #dropzone .titulo { font-size: 0.9375rem; font-weight: 600; }
+  #dropzone .titulo { font-family: var(--font-display); font-size: 1.0625rem; font-weight: 600; }
   #dropzone .detalhe { color: hsl(var(--muted-foreground)); font-size: 0.8125rem; margin-top: 4px; }
   input[type=file] { display: none; }
 
@@ -116,9 +196,9 @@
   .stat {
     display: flex; align-items: center; justify-content: space-between;
     background: hsl(var(--muted)); border-radius: calc(var(--radius) - 8px);
-    padding: 16px 18px; margin-bottom: 18px;
+    padding: 20px 24px; margin-bottom: 24px;
   }
-  .stat .n { font-size: 1.75rem; font-weight: 700; line-height: 1; }
+  .stat .n { font-family: var(--font-display); font-size: 2rem; font-weight: 600; line-height: 1; }
   .stat .label { font-size: 0.75rem; color: hsl(var(--muted-foreground)); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
 
   details.section {
@@ -154,7 +234,7 @@
   .alert.info { background: hsl(var(--info-bg)); color: hsl(var(--info-foreground)); }
   .alert.info svg { color: hsl(var(--info)); }
 
-  .actions { display: flex; gap: 10px; margin-top: 22px; }
+  .actions { display: flex; gap: 12px; margin-top: 28px; }
   button {
     font: inherit; font-size: 0.875rem; font-weight: 600; height: 40px; padding: 0 16px;
     border-radius: calc(var(--radius) - 8px); border: 1px solid transparent; cursor: pointer;
@@ -171,12 +251,11 @@
   #sucesso { display: none; text-align: center; padding: 18px 4px 6px; }
   #sucesso .icon-wrap { width: 52px; height: 52px; margin: 0 auto 14px; border-radius: 50%; background: hsl(var(--success-bg)); display: flex; align-items: center; justify-content: center; }
   #sucesso .icon-wrap svg { width: 24px; height: 24px; color: hsl(var(--success)); }
-  #sucesso h2 { margin: 0 0 6px; font-size: 1.125rem; }
+  #sucesso h2 { margin: 0 0 6px; font-family: var(--font-display); font-size: 1.3125rem; font-weight: 600; }
   #sucesso p { margin: 0 0 18px; color: hsl(var(--muted-foreground)); font-size: 0.875rem; line-height: 1.5; }
   #sucesso button { width: 100%; background: hsl(var(--muted)); color: hsl(var(--foreground)); border: 1px solid hsl(var(--border)); }
   #sucesso button:hover { background: hsl(var(--border)); }
 
-  .footnote { text-align: center; margin: 28px 0 0; font-size: 0.75rem; color: hsl(var(--muted-foreground)); }
 </style>
 </head>
 <body>
@@ -184,14 +263,21 @@
 <div class="corner-glow corner-glow-tl" aria-hidden="true"></div>
 <div class="corner-glow corner-glow-tr" aria-hidden="true"></div>
 
+<button id="btnTema" type="button" onclick="alternarTema()" aria-label="Alternar entre tema claro e escuro">
+  <svg class="icone-sol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+    <circle cx="12" cy="12" r="4.2"/>
+    <path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>
+  </svg>
+  <svg class="icone-lua" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/>
+  </svg>
+</button>
+
 <div class="page">
   <header class="hero">
     <div class="brand">
-      <svg class="sun-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
-        <circle cx="12" cy="12" r="4.2"/>
-        <path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>
-      </svg>
-      <h1>Importar PDF · FOPAG</h1>
+      <p class="eyebrow">Governo do Estado do Tocantins · Secretaria de Desenvolvimento das Regiões Metropolitanas</p>
+      <h1><span class="script">Importar</span> PDF · FOPAG</h1>
       <p class="sub">Arraste o relatório do Ergon aqui. Nada é gravado na planilha até você conferir e baixar o arquivo.</p>
     </div>
   </header>
@@ -254,7 +340,6 @@
     </div>
   </div>
 
-  <p class="footnote">Governo do Estado do Tocantins · Secretaria de Desenvolvimento das Regiões Metropolitanas</p>
 </div>
 
 <script>
@@ -265,6 +350,13 @@ const dropzone = document.getElementById("dropzone");
 const inputArquivo = document.getElementById("arquivo");
 let ultimosItens = [];
 let arquivoAtual = null;   // guarda o PDF tanto se veio de clique quanto de arrastar
+
+function alternarTema() {
+  const atual = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+  const novo = atual === "dark" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", novo);
+  try { localStorage.setItem("fopag-tema", novo); } catch (e) {}
+}
 
 const DISPLAY = { dropzone: "block", status: "block", erro: "flex", resultado: "block", sucesso: "block" };
 const ESTADOS = Object.keys(DISPLAY);
