@@ -157,6 +157,13 @@
   :root[data-theme="dark"] #btnTema .icone-sol { display: none; }
   :root[data-theme="dark"] #btnTema .icone-lua { display: block; }
 
+  .credito {
+    position: fixed; bottom: 16px; right: 18px; z-index: 2;
+    font-size: 0.6875rem; color: hsl(var(--muted-foreground));
+    text-decoration: none; opacity: .65; transition: opacity .15s, color .15s;
+  }
+  .credito:hover { opacity: 1; color: hsl(var(--primary)); }
+
   .hero { position: relative; z-index: 1; text-align: center; padding-bottom: 40px; }
   .brand { display: flex; flex-direction: column; align-items: center; gap: 12px; }
   .eyebrow { margin: 0; color: hsl(var(--primary)); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; }
@@ -272,6 +279,8 @@
     <path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/>
   </svg>
 </button>
+
+<a class="credito" href="https://github.com/RicardoRealDev/FOPAG-importer" target="_blank" rel="noopener">Desenvolvido por Ricardo Real</a>
 
 <div class="page">
   <header class="hero">
