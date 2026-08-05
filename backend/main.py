@@ -2,9 +2,10 @@
 Ponto de entrada HTTP (Google Cloud Functions / Cloud Run).
 
 Endpoint único: recebe um PDF, devolve o que encontrou (modo "revisar")
-ou gera um .xlsx preenchido pra download (qualquer outro modo). Fino de
-propósito: toda a lógica de verdade mora em parser.py e xlsx_writer.py -
-este arquivo só faz a "cola" HTTP (parse do request, CORS, resposta).
+ou gera o arquivo .xlsx preenchido pra download (modo "gerar_arquivo").
+Fino de propósito: toda a lógica de verdade mora em parser.py e
+xlsx_writer.py - este arquivo só faz a "cola" HTTP (parse do request,
+CORS, resposta).
 """
 from __future__ import annotations
 
@@ -47,6 +48,7 @@ def _ler_instituicoes(spreadsheet_id: str) -> dict[str, str]:
             out[str(config.CONSIGNACOES_ROW_START + i)] = row[0].strip()
     return out
 
+
 def _processar(pdf_bytes: bytes, spreadsheet_id: str) -> dict:
     pages = pdf_extract.extract_pages(pdf_bytes)
     instituicoes = _ler_instituicoes(spreadsheet_id)
@@ -55,11 +57,17 @@ def _processar(pdf_bytes: bytes, spreadsheet_id: str) -> dict:
     r2 = p.parse_consignacoes(pages, instituicoes)
     r3 = p.parse_encargos(pages)
     r4 = p.parse_irrf(pages)
+    r5 = p.parse_rendimentos(pages)
     mes_ano_label = p.extrair_mes_ano(pages)
 
-    achados = r1.achados + r2.achados + r3.achados + r4.achados
-    avisos = r1.avisos + r2.avisos + r3.avisos + r4.avisos
-    return {"achados": achados, "avisos": avisos, "mes_ano_label": mes_ano_label}
+    achados = r1.achados + r2.achados + r3.achados + r4.achados + r5.achados
+    avisos = r1.avisos + r2.avisos + r3.avisos + r4.avisos + r5.avisos
+    return {
+        "achados": achados,
+        "avisos": avisos,
+        "mes_ano_label": mes_ano_label,
+        "nao_mapeados": r5.nao_mapeados,
+    }
 
 
 @functions_framework.http
@@ -77,7 +85,7 @@ def importar_pdf(request: Request):
     if not spreadsheet_id:
         return jsonify({"erro": "Informe spreadsheet_id."}), 400, _cors_headers()
 
-    modo = request.form.get("modo", "revisar")  # "revisar" | qualquer outro = gerar arquivo
+    modo = request.form.get("modo", "revisar")  # "revisar" | "gerar_arquivo"
 
     pdf_bytes = request.files["pdf"].read()
 
@@ -87,6 +95,7 @@ def importar_pdf(request: Request):
         return jsonify({"erro": f"Não consegui ler o PDF: {e}"}), 422, _cors_headers()
 
     achados = resultado["achados"]
+    nao_mapeados = resultado.get("nao_mapeados", [])
 
     if modo == "revisar":
         return jsonify({
@@ -96,14 +105,17 @@ def importar_pdf(request: Request):
                 {"aba": a.sheet, "celula": a.cell, "valor": a.valor, "origem": a.origem, "confianca": a.confianca}
                 for a in achados
             ],
+            "nao_mapeados": [
+                {"regime": nm.regime, "codigo": nm.codigo, "descricao": nm.descricao, "valor": nm.valor}
+                for nm in nao_mapeados
+            ],
             "avisos": resultado["avisos"],
         }), 200, _cors_headers()
 
     # modo == "gerar_arquivo": gera um .xlsx preenchido a partir do modelo,
-    # em vez de escrever ao vivo via Google Sheets API - mais simples, sem
-    # CORS/timeout de escrita.
+    # em vez de escrever ao vivo via Google Sheets API.
     xlsx_bytes, total_aplicado, nao_encontrados = xlsx_writer.gerar_xlsx(
-        achados, mes_ano_label=resultado.get("mes_ano_label")
+        achados, mes_ano_label=resultado.get("mes_ano_label"), nao_mapeados=nao_mapeados
     )
     baixa_confianca = [a for a in achados if a.confianca == "baixa"]
 
@@ -113,5 +125,6 @@ def importar_pdf(request: Request):
     headers["X-Total-Aplicado"] = str(total_aplicado)
     headers["X-Nao-Encontrados"] = str(len(nao_encontrados))
     headers["X-Baixa-Confianca"] = str(len(baixa_confianca))
-    headers["Access-Control-Expose-Headers"] = "X-Total-Aplicado, X-Nao-Encontrados, X-Baixa-Confianca"
+    headers["X-Nao-Mapeados"] = str(len(nao_mapeados))
+    headers["Access-Control-Expose-Headers"] = "X-Total-Aplicado, X-Nao-Encontrados, X-Baixa-Confianca, X-Nao-Mapeados"
     return xlsx_bytes, 200, headers

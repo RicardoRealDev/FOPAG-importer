@@ -36,9 +36,19 @@ class Achado:
 
 
 @dataclass
+class ItemNaoMapeado:
+    regime: str
+    codigo: str
+    descricao: str
+    valor: float
+    origem: str
+
+
+@dataclass
 class ResultadoParse:
     achados: list[Achado] = field(default_factory=list)
     avisos: list[str] = field(default_factory=list)
+    nao_mapeados: list[ItemNaoMapeado] = field(default_factory=list)
 
 
 def _to_float(token: str) -> float:
@@ -58,6 +68,48 @@ def normalize(text: str) -> str:
 
 def _similarity(a: str, b: str) -> float:
     return SequenceMatcher(None, normalize(a), normalize(b)).ratio()
+
+
+def _bloco_descricoes(lines: list[str], anchor_idx: int) -> tuple[int, int, list[str]]:
+    """A partir de uma linha que bate com INSTITUICAO_RE (anchor_idx),
+    expande pra trás e pra frente pra achar o bloco completo de itens
+    "código - descrição", tolerando descrições que quebram em mais de uma
+    linha no PDF (ex: "1113 - Ressarcimento 40%, Art. 22-A, Lei" seguido de
+    "3661/2020" na linha de baixo - essa segunda linha não bate com
+    INSTITUICAO_RE nem é um número, é só a continuação do texto).
+
+    Devolve (start, end, itens) - start/end são os índices em `lines` que
+    cobrem o bloco inteiro (incluindo continuações), itens é a lista de
+    descrições já reconstituídas (uma por item de verdade, texto quebrado
+    unido com espaço)."""
+    end = anchor_idx
+    while end + 1 < len(lines):
+        nxt = lines[end + 1]
+        if INSTITUICAO_RE.match(nxt) or _classify(nxt) is None:
+            end += 1
+        else:
+            break  # comecei a bater em número - bloco de descrição acabou
+
+    start = anchor_idx
+    while start > 0:
+        prev = lines[start - 1]
+        if INSTITUICAO_RE.match(prev) or _classify(prev) is None:
+            start -= 1
+        else:
+            break
+
+    bloco = lines[start:end + 1]
+    itens = []
+    i = 0
+    while i < len(bloco):
+        texto = bloco[i]
+        j = i + 1
+        while j < len(bloco) and not INSTITUICAO_RE.match(bloco[j]):
+            texto += " " + bloco[j]
+            j += 1
+        itens.append(texto)
+        i = j
+    return start, end, itens
 
 
 def find_best_match(nome_pdf: str, candidatos: dict[str, str], limiar: float = 0.55) -> tuple[str | None, float]:
@@ -352,15 +404,12 @@ def parse_irrf(pages: list[str]) -> ResultadoParse:
             continue
         irrf_idx = lines.index(config.IRRF_LINHA_DESCRICAO)
 
-        # expande o bloco de descricoes (linhas "codigo - nome" contiguas)
-        start = irrf_idx
-        while start > 0 and INSTITUICAO_RE.match(lines[start - 1]):
-            start -= 1
-        end = irrf_idx
-        while end + 1 < len(lines) and INSTITUICAO_RE.match(lines[end + 1]):
-            end += 1
-        n = end - start + 1
-        pos = irrf_idx - start
+        start, end, itens = _bloco_descricoes(lines, irrf_idx)
+        n = len(itens)
+        pos = next((i for i, it in enumerate(itens) if it.startswith(config.IRRF_LINHA_DESCRICAO)), None)
+        if pos is None:
+            resultado.avisos.append(f"Pág. {page_num}: não consegui localizar '{config.IRRF_LINHA_DESCRICAO}' dentro do bloco reconstituído.")
+            continue
 
         # coleta os tokens numericos DEPOIS do bloco de descricoes: espera
         # 7 grupos de tamanho n (Quant/Valor x3 + Total)
@@ -387,4 +436,84 @@ def parse_irrf(pages: list[str]) -> ResultadoParse:
     for cell in config.IRRF_REGIME_TO_CELL.values():
         if cell not in encontrados_cells:
             resultado.avisos.append(f"Não encontrei IRRF para a célula {cell} (pode ser R$ 0,00 esse mês, ou o relatório de RENDIMENTOS não veio no PDF).")
-    return resultado     
+    return resultado
+
+
+# ---------------------------------------------------------------------------
+# 5) RENDIMENTOS -> detalhamento rubrica-por-rubrica (mapeamento FIXO, ver
+# config.RENDIMENTOS_MAPEAMENTO - não usa comparação de texto)
+# ---------------------------------------------------------------------------
+_CODIGO_DESCRICAO_RE = re.compile(r"^(\d+)\s*-\s*(.+)$")
+
+
+def _rendimentos_regime_titulo(lines: list[str], text: str) -> str | None:
+    """Só reconhece a página PRINCIPAL de rendimentos de cada regime - não
+    "DESCONTOS" (isso é parse_irrf), nem "INDENIZAÇÕES" ou "EXERCÍCIOS
+    ANTERIORES" (sub-relatórios ainda não mapeados)."""
+    if "RENDIMENTOS" not in lines:
+        return None
+    if "DESCONTOS" in lines or "INDENIZAÇÕES" in lines or "EXERCÍCIOS ANTERIORES" in lines:
+        return None
+    if "RESUMO GERAL" in text:
+        return None  # agregado de todos os regimes - ignorar p/ nao contar em dobro
+    for titulo in config.RENDIMENTOS_MAPEAMENTO.keys():
+        if titulo in text:
+            return titulo
+    return None
+
+
+def parse_rendimentos(pages: list[str]) -> ResultadoParse:
+    resultado = ResultadoParse()
+
+    for page_num, text in enumerate(pages, start=1):
+        lines = [l.strip() for l in text.split("\n") if l.strip()]
+        titulo_regime = _rendimentos_regime_titulo(lines, text)
+        if titulo_regime is None:
+            continue
+
+        # acha uma linha-ancora "codigo - descricao" pra partir dali
+        anchor_idx = next((idx for idx, l in enumerate(lines) if INSTITUICAO_RE.match(l)), None)
+        if anchor_idx is None:
+            resultado.avisos.append(f"Pág. {page_num} ({titulo_regime}): não achei nenhuma linha 'código - descrição' em RENDIMENTOS.")
+            continue
+
+        _start, desc_end, descricoes = _bloco_descricoes(lines, anchor_idx)
+        n = len(descricoes)
+
+        tokens = []
+        for l in lines[desc_end + 1:]:
+            tipo = _classify(l)
+            if tipo:
+                tokens.append((tipo, _to_float(l) if tipo != "int" else int(l)))
+            if len(tokens) >= 7 * n:
+                break
+        if len(tokens) < 7 * n:
+            resultado.avisos.append(
+                f"Pág. {page_num} ({titulo_regime}): esperava {7 * n} números em RENDIMENTOS, achei {len(tokens)}."
+            )
+            continue
+
+        total_array = [v for (_t, v) in tokens[6 * n: 7 * n]]
+        mapa = config.RENDIMENTOS_MAPEAMENTO[titulo_regime]
+        somas_por_linha: dict[str, float] = {}
+
+        for desc_pdf, valor in zip(descricoes, total_array):
+            m = _CODIGO_DESCRICAO_RE.match(desc_pdf)
+            if not m:
+                continue
+            codigo, descricao_texto = m.group(1), m.group(2)
+            if codigo in mapa:
+                row = mapa[codigo]
+                somas_por_linha[row] = somas_por_linha.get(row, 0.0) + valor
+            elif valor != 0:
+                resultado.nao_mapeados.append(ItemNaoMapeado(
+                    regime=titulo_regime, codigo=codigo, descricao=descricao_texto,
+                    valor=valor, origem=f"Pág. {page_num} — RENDIMENTOS",
+                ))
+
+        for row, valor in somas_por_linha.items():
+            origem = f"Pág. {page_num} — RENDIMENTOS — {titulo_regime}"
+            resultado.achados.append(Achado(config.SHEET_LIQUIDO, f"G{row}", valor, origem))
+            resultado.achados.append(Achado(config.SHEET_LIQUIDO, f"H{row}", valor, origem))
+
+    return resultado

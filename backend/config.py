@@ -14,10 +14,6 @@ SHEET_CONSIGNACOES = "CONSIGNAÇÕES FOLHA 1"
 # ---------------------------------------------------------------------------
 # 1) RESUMO DE CRÉDITO BANCÁRIO (GTO0003R) -> totais liquidos por regime
 # ---------------------------------------------------------------------------
-# Cada regime aparece em uma pagina do PDF com o titulo abaixo. O relatorio
-# da 4 numeros: Exercicio Atual, Exercicio Anterior, Indenizacoes, Total.
-# Mapeamos para a celula de TOTAL do bloco na Liquido Folha (H15/H30/H44/H58)
-# e para o resumo no topo da aba Consignacoes (D3:D6).
 CREDITO_BANCARIO_REGIMES = {
     "CONTRATO TEMPORARIO - REGIME GERAL DE PREVIDÊNCIA SOCIAL": {
         "liquido_total_cell": "H15",
@@ -42,8 +38,6 @@ CONSIGNACOES_TOTAL_GERAL_CELL = "D7"  # usado so' para conferencia/alerta
 # ---------------------------------------------------------------------------
 # 2) RESUMO DE CONSIGNAÇÕES (GTO0004R) -> detalhe por banco/instituicao
 # ---------------------------------------------------------------------------
-# Cada pagina lista consignacoes de um regime. A coluna de destino na aba
-# Consignacoes depende do regime da pagina.
 CONSIGNACOES_REGIME_TO_COLUMN = {
     "REGIME PRÓPRIO DE PREVIDÊNCIA SOCIAL": "F",   # Civil RPPS
     "REGIME GERAL DE PREVIDÊNCIA SOCIAL": "G",     # Civil RGPS (ativos)
@@ -59,8 +53,6 @@ CONSIGNACOES_SKIP_TITLES = ["GERAL"]
 # ---------------------------------------------------------------------------
 # 3) ENCARGOS SOCIAIS - GERAL (GTO0002R) -> encargos sociais consolidados
 # ---------------------------------------------------------------------------
-# So' nos interessa a secao "GERAL" (soma de todos os regimes), coluna
-# "Contribuicao do Estado", linha "Total" de cada fundo.
 ENCARGOS_FUNDO_TO_CELL = {
     "FUNDO DE PREVIDENCIA (FUNDO FINANCEIRO)": "F68",
     "FUNDO DE PREVIDENCIA (FUNDO PREVIDENCIÁRIO)": "F69",
@@ -72,10 +64,6 @@ ENCARGOS_SECTION_TITLE = "ENCARGOS SOCIAIS - GERAL"
 # ---------------------------------------------------------------------------
 # 4) RENDIMENTOS E DESCONTOS (GTO0001R) -> IRRF retido por regime
 # ---------------------------------------------------------------------------
-# Cada regime tem uma pagina "DESCONTOS" com uma linha "3014 - IRRF". O
-# valor na coluna "Total" dessa linha e' o IRRF retido daquele regime.
-# "RESUMO GERAL" (agregado de todos os regimes) e' ignorado, senao conta em
-# dobro.
 IRRF_REGIME_TO_CELL = {
     "RESUMO CONTRATO TEMPORARIO": "I15",
     "RESUMO ATIVOS - REGIME PRÓPRIO": "I30",
@@ -83,6 +71,53 @@ IRRF_REGIME_TO_CELL = {
     "RESUMO MILITARES": "I58",
 }
 IRRF_LINHA_DESCRICAO = "3014 - IRRF"
+
+# ---------------------------------------------------------------------------
+# 5) RENDIMENTOS (GTO0001R, pagina "RENDIMENTOS" principal de cada regime)
+# -> detalhamento rubrica-por-rubrica da Liquido Folha
+# ---------------------------------------------------------------------------
+# ATENCAO: este mapeamento e' FIXO (codigo Ergon -> linha da planilha),
+# conferido manualmente com o usuario - NAO usa comparacao de texto/nome,
+# porque isso ja' se provou perigoso (ex: "Ressarcimento 40%" e
+# "Ressarcimento 30%" tem frases quase identicas e comparacao de texto
+# confundiu os dois com confianca alta). So' adicione codigo novo aqui
+# depois de confirmar manualmente contra a planilha real.
+#
+# Quando dois codigos apontam pra mesma linha (ex: 1027+1028), os valores
+# sao somados.
+RENDIMENTOS_MAPEAMENTO = {
+    "RESUMO CONTRATO TEMPORARIO": {
+        "1201": "6",           # Vencimento Contratado -> Despesas Remuneração
+        "1027": "7",           # 13º Salário Proporcional
+        "1028": "7",           # Adiantamento de 13º Salário
+        "1204": "9",           # Férias Proporcionais Indenizadas
+        "1205": "9",           # Adicional de Férias Proporcionais Indenizadas
+        "1319": "12",          # Auxílio Alimentação
+    },
+    "RESUMO ATIVOS - REGIME PRÓPRIO": {
+        "1026": "19",          # 13º Salário
+        "1023": "22",          # Adicional de Férias
+        "1319": "23",          # Auxílio Alimentação
+        "1311": "24",          # Ressarcimento 30%
+        "1113": "25",          # Ressarcimento 40%
+        "1002": "27",          # Subsídio
+        "1001": "28",          # Vencimento
+    },
+    "RESUMO ATIVOS - REGIME GERAL": {
+        "1028": "33",          # Adiantamento de 13º Salário
+        "1113": "37",          # Ressarcimento 40%
+        "1311": "38",          # Ressarcimento 30%
+        "1319": "42",          # Auxílio Alimentação
+    },
+    "RESUMO MILITARES": {
+        "1026": "47",          # 13º Salário
+        "1113": "51",          # Ressarcimento 40%
+    },
+}
+# Linha (a partir daqui) onde ficam os itens que o mapeamento acima não
+# cobre - nunca lançados na planilha, só listados para revisão manual.
+RENDIMENTOS_NAO_MAPEADOS_LINHA_INICIAL = 130
+RENDIMENTOS_NAO_MAPEADOS_LINHA_FINAL = 250  # limpo até aqui antes de escrever, para não sobrar lixo de mes anterior
 
 # ---------------------------------------------------------------------------
 # Registro de origem por celula (auditoria: de onde veio cada numero)
@@ -98,8 +133,8 @@ def celulas_gerenciadas() -> dict[str, list[str]]:
     0 de verdade em vez de continuar com o valor do mês anterior.
 
     NÃO inclui as células que o sistema ainda não sabe preencher sozinho
-    (detalhamento rubrica-por-rubrica, NES) - essas continuam manuais e
-    não são tocadas aqui."""
+    (detalhamento rubrica-por-rubrica não mapeado, NES) - essas continuam
+    manuais e não são tocadas aqui."""
     celulas: dict[str, set[str]] = {}
 
     def add(sheet, cell):
@@ -123,13 +158,10 @@ def celulas_gerenciadas() -> dict[str, list[str]]:
 
 
 # ---------------------------------------------------------------------------
-# Detalhamento rubrica-por-rubrica da aba Líquido Folha - o parser NÃO sabe
-# preencher essas linhas (só sabe o total do bloco, via
-# CREDITO_BANCARIO_REGIMES). Mas se a gente não limpar essas células ao
-# gerar um mês novo, elas continuam mostrando o valor do mês anterior,
-# parecendo dado real quando na verdade está desatualizado - pior do que
-# deixar em branco. Por isso são zeradas junto (mas nunca preenchidas
-# automaticamente com um valor - só o usuário sabe o valor certo aqui).
+# Detalhamento rubrica-por-rubrica da aba Líquido Folha - zerado ao gerar
+# mês novo (evita mostrar dado velho disfarçado de atual). O que TEM
+# mapeamento fixo (RENDIMENTOS_MAPEAMENTO) é preenchido por cima; o resto
+# fica em branco mesmo, aguardando lançamento manual.
 DETALHE_RUBRICA_BLOCOS = [
     (6, 14),    # Contratos - RGPS (total em H15)
     (18, 29),   # RPPS (total em H30)
@@ -140,8 +172,8 @@ DETALHE_RUBRICA_COLUNAS = ["G", "H", "I"]
 
 
 def celulas_detalhe_manual() -> dict[str, list[str]]:
-    """Células de detalhe que o sistema NÃO preenche sozinho, mas limpa ao
-    gerar um mês novo (ver docstring acima)."""
+    """Células de detalhe zeradas ao gerar um mês novo (ver docstring
+    acima)."""
     celulas: list[str] = []
     for inicio, fim in DETALHE_RUBRICA_BLOCOS:
         for row in range(inicio, fim + 1):

@@ -58,7 +58,45 @@ def _corrigir_titulos_de_mes(wb, mes_ano_label: str | None) -> list[str]:
     return corrigidos
 
 
+def _escrever_nao_mapeados(wb, nao_mapeados) -> None:
+    """Escreve os itens de RENDIMENTOS sem mapeamento fixo numa tabela
+    separada, abaixo dos dados normais - nunca dentro das linhas de
+    detalhe (evita lançar valor em rubrica errada). Sempre limpa a área
+    inteira antes, pra não sobrar item de mês anterior."""
+    if config.SHEET_LIQUIDO not in wb.sheetnames:
+        return
+    ws = wb[config.SHEET_LIQUIDO]
+    inicio = config.RENDIMENTOS_NAO_MAPEADOS_LINHA_INICIAL
+    fim = config.RENDIMENTOS_NAO_MAPEADOS_LINHA_FINAL
+
+    for row in range(inicio, fim + 1):
+        for col in "ABCDE":
+            ws[f"{col}{row}"] = None
+
+    if not nao_mapeados:
+        return
+
+    ws[f"A{inicio}"] = "ITENS DE RENDIMENTOS NÃO MAPEADOS AUTOMATICAMENTE — confira e lance manualmente"
+    ws[f"A{inicio + 1}"] = "Regime"
+    ws[f"B{inicio + 1}"] = "Código"
+    ws[f"C{inicio + 1}"] = "Descrição (PDF)"
+    ws[f"D{inicio + 1}"] = "Valor"
+    ws[f"E{inicio + 1}"] = "Origem"
+
+    row = inicio + 2
+    for item in nao_mapeados:
+        if row > fim:
+            break  # nao deveria acontecer (fim tem folga generosa), mas nao trava se acontecer
+        ws[f"A{row}"] = item.regime
+        ws[f"B{row}"] = item.codigo
+        ws[f"C{row}"] = item.descricao
+        ws[f"D{row}"] = item.valor
+        ws[f"E{row}"] = item.origem
+        row += 1
+
+
 def gerar_xlsx(achados: list[Achado], mes_ano_label: str | None = None,
+               nao_mapeados: list | None = None,
                apenas_alta_e_media: bool = True) -> tuple[bytes, int, list[str]]:
     """Abre o modelo, escreve cada Achado na célula certa, corrige os
     títulos de mês/ano desatualizados (se mes_ano_label for informado) e
@@ -72,8 +110,8 @@ def gerar_xlsx(achados: list[Achado], mes_ano_label: str | None = None,
     # o valor de julho ainda no arquivo.
     #
     # Isso vale tanto pras células que o sistema PREENCHE sozinho quanto
-    # pras que só LIMPA (detalhe rubrica-por-rubrica, que ainda é manual) -
-    # nos dois casos, deixar o número do mês anterior ali seria pior do que
+    # pras que só LIMPA (detalhe rubrica-por-rubrica não mapeado) - nos
+    # dois casos, deixar o número do mês anterior ali seria pior do que
     # deixar em branco: pareceria dado real do mês novo sem ser.
     for celulas_dict in (config.celulas_gerenciadas(), config.celulas_detalhe_manual()):
         for sheet_name, cells in celulas_dict.items():
@@ -94,6 +132,7 @@ def gerar_xlsx(achados: list[Achado], mes_ano_label: str | None = None,
         ws[a.cell] = a.valor
 
     _corrigir_titulos_de_mes(wb, mes_ano_label)
+    _escrever_nao_mapeados(wb, nao_mapeados or [])
 
     buf = io.BytesIO()
     wb.save(buf)
