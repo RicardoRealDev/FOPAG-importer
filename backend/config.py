@@ -120,3 +120,31 @@ def celulas_gerenciadas() -> dict[str, list[str]]:
             add(SHEET_CONSIGNACOES, f"{col}{row}")
 
     return {sheet: sorted(cells) for sheet, cells in celulas.items()}
+
+
+# ---------------------------------------------------------------------------
+# Detalhamento rubrica-por-rubrica da aba Líquido Folha - o parser NÃO sabe
+# preencher essas linhas (só sabe o total do bloco, via
+# CREDITO_BANCARIO_REGIMES). Mas se a gente não limpar essas células ao
+# gerar um mês novo, elas continuam mostrando o valor do mês anterior,
+# parecendo dado real quando na verdade está desatualizado - pior do que
+# deixar em branco. Por isso são zeradas junto (mas nunca preenchidas
+# automaticamente com um valor - só o usuário sabe o valor certo aqui).
+DETALHE_RUBRICA_BLOCOS = [
+    (6, 14),    # Contratos - RGPS (total em H15)
+    (18, 29),   # RPPS (total em H30)
+    (33, 43),   # RGPS (total em H44)
+    (47, 57),   # Militar (total em H58)
+]
+DETALHE_RUBRICA_COLUNAS = ["G", "H", "I"]
+
+
+def celulas_detalhe_manual() -> dict[str, list[str]]:
+    """Células de detalhe que o sistema NÃO preenche sozinho, mas limpa ao
+    gerar um mês novo (ver docstring acima)."""
+    celulas: list[str] = []
+    for inicio, fim in DETALHE_RUBRICA_BLOCOS:
+        for row in range(inicio, fim + 1):
+            for col in DETALHE_RUBRICA_COLUNAS:
+                celulas.append(f"{col}{row}")
+    return {SHEET_LIQUIDO: sorted(celulas)}
