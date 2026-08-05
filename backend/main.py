@@ -101,6 +101,7 @@ def importar_pdf(request: Request):
         return jsonify({
             "modo": "revisar",
             "total_encontrado": len(achados),
+            "mes_ano_label": resultado.get("mes_ano_label"),
             "itens": [
                 {"aba": a.sheet, "celula": a.cell, "valor": a.valor, "origem": a.origem, "confianca": a.confianca}
                 for a in achados
