@@ -88,13 +88,13 @@
 
   <div id="acoes">
     <button id="btnCancelar" onclick="reiniciar()">Cancelar</button>
-    <button id="btnAplicar" onclick="aplicar()">Gravar na planilha</button>
+    <button id="btnAplicar" onclick="aplicar()">Baixar planilha preenchida</button>
   </div>
 </div>
 
 <div id="sucesso">
   <div class="icone">✅</div>
-  <h2 id="sucessoTitulo">Planilha atualizada</h2>
+  <h2 id="sucessoTitulo">Planilha gerada</h2>
   <p id="sucessoDetalhe" class="sub"></p>
   <button onclick="reiniciar()">Importar outro PDF</button>
 </div>
@@ -203,30 +203,46 @@ function mostrarResultado(dados) {
 async function aplicar() {
   const btn = document.getElementById("btnAplicar");
   btn.disabled = true;
-  btn.textContent = "Gravando…";
+  btn.textContent = "Gerando arquivo…";
 
   const form = new FormData();
   form.append("spreadsheet_id", SPREADSHEET_ID);
-  form.append("modo", "aplicar");
+  form.append("modo", "gerar_arquivo");
   form.append("pdf", arquivoAtual);
 
   try {
     const resp = await fetch(API_URL, { method: "POST", body: form });
-    const dados = await resp.json();
-    if (!resp.ok) throw new Error(dados.erro || "Erro ao gravar.");
+    if (!resp.ok) {
+      const dados = await resp.json().catch(() => ({}));
+      throw new Error(dados.erro || "Erro ao gerar o arquivo.");
+    }
+
+    const totalAplicado = resp.headers.get("X-Total-Aplicado") || "?";
+    const baixaConfianca = parseInt(resp.headers.get("X-Baixa-Confianca") || "0", 10);
+
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "Planilha FOPAG preenchida.xlsx";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
 
     document.getElementById("resultado").style.display = "none";
     document.getElementById("sucesso").style.display = "block";
     document.getElementById("sucessoDetalhe").textContent =
-      `${dados.total_aplicado} valores atualizados na planilha.` +
-      (dados.nao_aplicados_baixa_confianca.length
-        ? ` ${dados.nao_aplicados_baixa_confianca.length} ficaram de fora por baixa confiança — confira manualmente.`
-        : "");
+      `${totalAplicado} valores preenchidos no arquivo baixado.` +
+      (baixaConfianca
+        ? ` ${baixaConfianca} ficaram de fora por baixa confiança — preencha manualmente.`
+        : "") +
+      ` Agora é só substituir no Google Sheets (Arquivo > Importar > Fazer upload > Substituir planilha).`;
   } catch (err) {
-    mostrarErro("Não consegui gravar: " + err.message);
+    mostrarErro("Não consegui gerar o arquivo: " + err.message);
   } finally {
     btn.disabled = false;
-    btn.textContent = "Gravar na planilha";
+    btn.textContent = "Baixar planilha preenchida";
   }
 }
 
