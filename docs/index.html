@@ -3,100 +3,260 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#F2A90D" />
 <title>Importar PDF · Planilha FOPAG</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='5.5' fill='%23F2A90D'/%3E%3C/svg%3E" />
 <style>
-  :root { --azul: #1F4E78; --azul-claro: #E8F0FE; --dourado: #C98500; --verde: #188038; --vermelho: #C5221F; --cinza: #5f6368; }
+  :root {
+    --background: 40 40% 98%;
+    --foreground: 240 10% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 12%;
+    --muted: 40 24% 95%;
+    --muted-foreground: 240 5% 42%;
+    --border: 240 8% 89%;
+    --ring: 38 92% 50%;
+    --primary: 38 92% 50%;
+    --primary-foreground: 30 45% 12%;
+    --secondary: 213 94% 32%;
+    --success: 142 71% 30%;
+    --success-bg: 142 55% 94%;
+    --warning: 32 90% 40%;
+    --warning-bg: 42 96% 93%;
+    --warning-foreground: 30 60% 25%;
+    --destructive: 0 72% 45%;
+    --destructive-bg: 0 70% 96%;
+    --destructive-foreground: 0 60% 32%;
+    --info: 213 80% 40%;
+    --info-bg: 213 70% 95%;
+    --info-foreground: 213 70% 28%;
+    --radius: 0.85rem;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --background: 240 10% 6%;
+      --foreground: 0 0% 95%;
+      --card: 240 8% 9%;
+      --card-foreground: 0 0% 95%;
+      --muted: 240 6% 14%;
+      --muted-foreground: 240 5% 65%;
+      --border: 240 6% 19%;
+      --ring: 38 92% 55%;
+      --primary: 38 92% 55%;
+      --primary-foreground: 30 45% 10%;
+      --secondary: 213 80% 58%;
+      --success: 142 55% 48%;
+      --success-bg: 142 40% 14%;
+      --warning: 38 92% 58%;
+      --warning-bg: 40 55% 16%;
+      --warning-foreground: 42 90% 82%;
+      --destructive: 0 70% 58%;
+      --destructive-bg: 0 45% 16%;
+      --destructive-foreground: 0 80% 88%;
+      --info: 213 80% 62%;
+      --info-bg: 213 45% 15%;
+      --info-foreground: 213 80% 85%;
+    }
+  }
+
   * { box-sizing: border-box; }
-  body { font-family: -apple-system, Segoe UI, Arial, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; color: #202124; }
-  h1 { font-size: 22px; color: var(--azul); margin-bottom: 4px; }
-  p.sub { color: var(--cinza); margin-top: 0; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
+    -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 640px; margin: 0 auto; padding: 56px 20px 48px; }
+
+  .hero { position: relative; text-align: center; padding-bottom: 26px; }
+  .sun-glow {
+    position: absolute; top: -70px; left: 50%; transform: translateX(-50%);
+    width: 300px; height: 300px; pointer-events: none; z-index: 0;
+    background: radial-gradient(circle, hsl(var(--primary) / .30), transparent 70%);
+    filter: blur(6px);
+  }
+  .brand { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .sun-mark { width: 38px; height: 38px; color: hsl(var(--primary)); }
+  h1 { margin: 0; font-size: 1.375rem; font-weight: 650; letter-spacing: -0.01em; }
+  .sub { margin: 0; color: hsl(var(--muted-foreground)); font-size: 0.875rem; max-width: 420px; line-height: 1.45; }
+  .flag-line {
+    position: relative; z-index: 1; margin: 18px auto 0; height: 3px; width: 96px; border-radius: 999px;
+    background: linear-gradient(90deg, hsl(var(--secondary)), hsl(var(--primary)), hsl(var(--success)));
+    opacity: .75;
+  }
+
+  .card {
+    position: relative; z-index: 1;
+    background: hsl(var(--card)); color: hsl(var(--card-foreground));
+    border: 1px solid hsl(var(--border)); border-radius: var(--radius);
+    padding: 24px; box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.04);
+  }
 
   #dropzone {
-    border: 3px dashed #9aa0a6; border-radius: 12px; padding: 48px 20px;
-    text-align: center; cursor: pointer; transition: all .15s; margin: 24px 0;
+    border: 1.5px dashed hsl(var(--border)); border-radius: calc(var(--radius) - 6px);
+    padding: 44px 20px; text-align: center; cursor: pointer;
+    transition: border-color .15s, background-color .15s;
   }
-  #dropzone.arrastando { border-color: var(--azul); background: var(--azul-claro); }
-  #dropzone svg { width: 48px; height: 48px; color: var(--azul); margin-bottom: 8px; }
-  #dropzone .titulo { font-size: 17px; font-weight: 600; }
-  #dropzone .detalhe { color: var(--cinza); font-size: 13px; margin-top: 4px; }
+  #dropzone:hover { border-color: hsl(var(--primary) / .55); background: hsl(var(--muted) / .5); }
+  #dropzone.arrastando { border-color: hsl(var(--primary)); background: hsl(var(--primary) / .08); }
+  #dropzone svg.icon { width: 34px; height: 34px; color: hsl(var(--primary)); margin-bottom: 10px; }
+  #dropzone .titulo { font-size: 0.9375rem; font-weight: 600; }
+  #dropzone .detalhe { color: hsl(var(--muted-foreground)); font-size: 0.8125rem; margin-top: 4px; }
   input[type=file] { display: none; }
 
-  #status { text-align: center; padding: 24px; color: var(--cinza); display: none; }
-  .spinner { width: 28px; height: 28px; border: 3px solid #e0e0e0; border-top-color: var(--azul); border-radius: 50%; animation: girar 0.8s linear infinite; margin: 0 auto 10px; }
-  @keyframes girar { to { transform: rotate(360deg); } }
+  #status { display: none; text-align: center; padding: 34px 0; color: hsl(var(--muted-foreground)); }
+  .spinner {
+    width: 26px; height: 26px; margin: 0 auto 12px; border-radius: 50%;
+    border: 2.5px solid hsl(var(--border)); border-top-color: hsl(var(--primary));
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #status p { font-size: 0.875rem; margin: 0; }
 
   #resultado { display: none; }
-  .card-resumo { background: var(--azul-claro); border-radius: 10px; padding: 16px 20px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
-  .card-resumo .n { font-size: 28px; font-weight: bold; color: var(--azul); }
-  .card-resumo .label { color: var(--cinza); font-size: 13px; }
+  .stat {
+    display: flex; align-items: center; justify-content: space-between;
+    background: hsl(var(--muted)); border-radius: calc(var(--radius) - 8px);
+    padding: 16px 18px; margin-bottom: 18px;
+  }
+  .stat .n { font-size: 1.75rem; font-weight: 700; line-height: 1; }
+  .stat .label { font-size: 0.75rem; color: hsl(var(--muted-foreground)); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
 
-  details { border: 1px solid #dadce0; border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
-  summary { padding: 10px 14px; cursor: pointer; font-weight: 600; background: #f8f9fa; }
-  .item { display: flex; justify-content: space-between; padding: 8px 14px; border-top: 1px solid #eee; font-size: 13px; }
-  .item .origem { color: var(--cinza); flex: 1; }
-  .item .valor { font-weight: 600; white-space: nowrap; margin-left: 12px; }
-  .badge { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 10px; margin-left: 6px; }
-  .badge.alta { background: #e6f4ea; color: var(--verde); }
-  .badge.media { background: #fef7e0; color: var(--dourado); }
-  .badge.baixa { background: #fce8e6; color: var(--vermelho); }
+  details.section {
+    border: 1px solid hsl(var(--border)); border-radius: calc(var(--radius) - 8px);
+    margin-bottom: 8px; overflow: hidden;
+  }
+  details.section summary {
+    list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between;
+    padding: 11px 14px; font-size: 0.875rem; font-weight: 600; background: hsl(var(--muted) / .6);
+  }
+  details.section summary::-webkit-details-marker { display: none; }
+  details.section summary .chev { width: 16px; height: 16px; color: hsl(var(--muted-foreground)); transition: transform .15s; flex-shrink: 0; }
+  details.section[open] summary .chev { transform: rotate(180deg); }
+  .item-row {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    padding: 9px 14px; font-size: 0.8125rem; border-top: 1px solid hsl(var(--border));
+  }
+  .item-row .origem { color: hsl(var(--muted-foreground)); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .item-row .valor { font-weight: 600; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
 
-  #avisos { background: #fef7e0; border-radius: 8px; padding: 12px 16px; font-size: 13px; color: #7A5900; margin-top: 16px; display: none; }
+  .badge { display: inline-flex; align-items: center; font-size: 0.6875rem; font-weight: 600; padding: 1px 7px; border-radius: 999px; }
+  .badge.alta { background: hsl(var(--success-bg)); color: hsl(var(--success)); }
+  .badge.media { background: hsl(var(--warning-bg)); color: hsl(var(--warning)); }
+  .badge.baixa { background: hsl(var(--destructive-bg)); color: hsl(var(--destructive)); }
 
-  #acoes { display: flex; gap: 10px; margin-top: 20px; }
-  button { font-size: 15px; padding: 12px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; }
-  #btnAplicar { background: var(--azul); color: white; flex: 1; }
-  #btnAplicar:disabled { background: #9aa0a6; cursor: default; }
-  #btnCancelar { background: #f1f3f4; color: #202124; }
+  .alert { display: none; gap: 10px; border-radius: calc(var(--radius) - 8px); padding: 13px 14px; font-size: 0.8125rem; margin-top: 14px; line-height: 1.5; }
+  .alert svg { width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px; }
+  .alert-title { font-weight: 600; margin-bottom: 3px; }
+  .alert.warning { background: hsl(var(--warning-bg)); color: hsl(var(--warning-foreground)); }
+  .alert.warning svg { color: hsl(var(--warning)); }
+  .alert.destructive { background: hsl(var(--destructive-bg)); color: hsl(var(--destructive-foreground)); }
+  .alert.destructive svg { color: hsl(var(--destructive)); }
+  .alert.info { background: hsl(var(--info-bg)); color: hsl(var(--info-foreground)); }
+  .alert.info svg { color: hsl(var(--info)); }
 
-  #sucesso { display: none; text-align: center; padding: 30px 0; }
-  #sucesso .icone { font-size: 48px; }
-  #sucesso h2 { color: var(--verde); }
+  .actions { display: flex; gap: 10px; margin-top: 22px; }
+  button {
+    font: inherit; font-size: 0.875rem; font-weight: 600; height: 40px; padding: 0 16px;
+    border-radius: calc(var(--radius) - 8px); border: 1px solid transparent; cursor: pointer;
+    transition: background-color .15s, border-color .15s, opacity .15s, filter .15s;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  button:focus-visible { outline: none; box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--ring) / .5); }
+  #btnAplicar { flex: 1; background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+  #btnAplicar:hover:not(:disabled) { filter: brightness(0.96); }
+  #btnAplicar:disabled { background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); cursor: default; }
+  #btnCancelar { background: transparent; border-color: hsl(var(--border)); color: hsl(var(--foreground)); }
+  #btnCancelar:hover { background: hsl(var(--muted)); }
 
-  #erro { display: none; background: #fce8e6; color: var(--vermelho); padding: 14px 18px; border-radius: 8px; margin-top: 16px; }
+  #sucesso { display: none; text-align: center; padding: 18px 4px 6px; }
+  #sucesso .icon-wrap { width: 52px; height: 52px; margin: 0 auto 14px; border-radius: 50%; background: hsl(var(--success-bg)); display: flex; align-items: center; justify-content: center; }
+  #sucesso .icon-wrap svg { width: 24px; height: 24px; color: hsl(var(--success)); }
+  #sucesso h2 { margin: 0 0 6px; font-size: 1.125rem; }
+  #sucesso p { margin: 0 0 18px; color: hsl(var(--muted-foreground)); font-size: 0.875rem; line-height: 1.5; }
+  #sucesso button { width: 100%; background: hsl(var(--muted)); color: hsl(var(--foreground)); border: 1px solid hsl(var(--border)); }
+  #sucesso button:hover { background: hsl(var(--border)); }
+
+  .footnote { text-align: center; margin: 28px 0 0; font-size: 0.75rem; color: hsl(var(--muted-foreground)); }
 </style>
 </head>
 <body>
 
-<h1>Importar PDF da FOPAG</h1>
-<p class="sub">Arraste o relatório do Ergon aqui. Nada é gravado na planilha até você conferir e confirmar.</p>
+<div class="page">
+  <header class="hero">
+    <div class="sun-glow" aria-hidden="true"></div>
+    <div class="brand">
+      <svg class="sun-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>
+      </svg>
+      <h1>Importar PDF · FOPAG</h1>
+      <p class="sub">Arraste o relatório do Ergon aqui. Nada é gravado na planilha até você conferir e baixar o arquivo.</p>
+    </div>
+    <div class="flag-line" aria-hidden="true"></div>
+  </header>
 
-<div id="dropzone">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 16V4m0 0L7 9m5-5l5 5M5 20h14" stroke-linecap="round" stroke-linejoin="round"/></svg>
-  <div class="titulo">Clique ou arraste o PDF aqui</div>
-  <div class="detalhe">Relatório do Ergon (Resumo de Crédito Bancário / Consignações / Encargos Sociais)</div>
-  <input type="file" id="arquivo" accept="application/pdf" />
-</div>
+  <div class="card">
+    <div id="dropzone">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 16V4m0 0L7 9m5-5l5 5M5 20h14" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div class="titulo">Clique ou arraste o PDF aqui</div>
+      <div class="detalhe">Relatório do Ergon — Crédito Bancário, Consignações, Encargos Sociais e Rendimentos</div>
+      <input type="file" id="arquivo" accept="application/pdf" />
+    </div>
 
-<div id="status">
-  <div class="spinner"></div>
-  <div id="statusTexto">Lendo o PDF…</div>
-</div>
+    <div id="status">
+      <div class="spinner"></div>
+      <p id="statusTexto">Lendo o PDF…</p>
+    </div>
 
-<div id="erro"></div>
+    <div id="erro" class="alert destructive" role="alert">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01" stroke-linecap="round"/></svg>
+      <div id="erroTexto"></div>
+    </div>
 
-<div id="resultado">
-  <div class="card-resumo">
-    <div>
-      <div class="label">Valores encontrados no PDF</div>
-      <div class="n" id="totalEncontrado">0</div>
+    <div id="resultado">
+      <div class="stat">
+        <div>
+          <div class="label">Valores encontrados no PDF</div>
+          <div class="n" id="totalEncontrado">0</div>
+        </div>
+      </div>
+
+      <div id="secoes"></div>
+
+      <div id="avisos" class="alert warning" role="status">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><path d="M12 9v4M12 17h.01" stroke-linecap="round"/></svg>
+        <div>
+          <div class="alert-title">Avisos</div>
+          <div id="avisosLista"></div>
+        </div>
+      </div>
+
+      <div id="naoMapeados" class="alert info" role="status">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 16v-5M12 8h.01" stroke-linecap="round"/></svg>
+        <div>
+          <div class="alert-title">Itens sem mapeamento automático</div>
+          <div id="naoMapeadosLista"></div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="btnCancelar" type="button" onclick="reiniciar()">Cancelar</button>
+        <button id="btnAplicar" type="button" onclick="aplicar()">Baixar planilha preenchida</button>
+      </div>
+    </div>
+
+    <div id="sucesso">
+      <div class="icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <h2 id="sucessoTitulo">Planilha gerada</h2>
+      <p id="sucessoDetalhe"></p>
+      <button type="button" onclick="reiniciar()">Importar outro PDF</button>
     </div>
   </div>
 
-  <div id="secoes"></div>
-
-  <div id="avisos"></div>
-
-  <div id="acoes">
-    <button id="btnCancelar" onclick="reiniciar()">Cancelar</button>
-    <button id="btnAplicar" onclick="aplicar()">Baixar planilha preenchida</button>
-  </div>
-</div>
-
-<div id="sucesso">
-  <div class="icone">✅</div>
-  <h2 id="sucessoTitulo">Planilha gerada</h2>
-  <p id="sucessoDetalhe" class="sub"></p>
-  <button onclick="reiniciar()">Importar outro PDF</button>
+  <p class="footnote">Governo do Estado do Tocantins · Secretaria de Desenvolvimento das Regiões Metropolitanas</p>
 </div>
 
 <script>
@@ -107,6 +267,9 @@ const dropzone = document.getElementById("dropzone");
 const inputArquivo = document.getElementById("arquivo");
 let ultimosItens = [];
 let arquivoAtual = null;   // guarda o PDF tanto se veio de clique quanto de arrastar
+
+const DISPLAY = { dropzone: "block", status: "block", erro: "flex", resultado: "block", sucesso: "block" };
+const ESTADOS = Object.keys(DISPLAY);
 
 dropzone.addEventListener("click", () => inputArquivo.click());
 dropzone.addEventListener("dragover", (e) => { e.preventDefault(); dropzone.classList.add("arrastando"); });
@@ -120,23 +283,21 @@ inputArquivo.addEventListener("change", (e) => {
   if (e.target.files.length) enviarPdf(e.target.files[0]);
 });
 
-function mostrar(id) {
-  ["dropzone", "status", "resultado", "sucesso", "erro"].forEach((s) => {
-    document.getElementById(s).style.display = "none";
-  });
-  document.getElementById(id).style.display = id === "acoes" ? "flex" : (id === "status" ? "block" : "block");
+function ocultarTodos() {
+  ESTADOS.forEach((id) => { document.getElementById(id).style.display = "none"; });
 }
 
 function mostrarErro(msg) {
-  mostrar("erro");
-  document.getElementById("erro").style.display = "block";
-  document.getElementById("erro").textContent = msg;
-  document.getElementById("dropzone").style.display = "block";
+  ocultarTodos();
+  document.getElementById("erro").style.display = DISPLAY.erro;
+  document.getElementById("erroTexto").textContent = msg;
+  document.getElementById("dropzone").style.display = DISPLAY.dropzone;
 }
 
 async function enviarPdf(arquivo) {
   arquivoAtual = arquivo;
-  mostrar("status");
+  ocultarTodos();
+  document.getElementById("status").style.display = DISPLAY.status;
   document.getElementById("statusTexto").textContent = "Lendo o PDF…";
 
   const form = new FormData();
@@ -172,13 +333,15 @@ function mostrarResultado(dados) {
   const grupos = agruparPorAba(dados.itens);
   Object.entries(grupos).forEach(([aba, itens]) => {
     const det = document.createElement("details");
+    det.className = "section";
     det.open = false;
     const sum = document.createElement("summary");
-    sum.textContent = `${aba} (${itens.length})`;
+    sum.innerHTML = `<span>${aba} (${itens.length})</span>` +
+      `<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
     det.appendChild(sum);
     itens.forEach((it) => {
       const row = document.createElement("div");
-      row.className = "item";
+      row.className = "item-row";
       row.innerHTML = `<span class="origem">${it.celula} — ${it.origem}</span>` +
         `<span class="valor">R$ ${it.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` +
         `<span class="badge ${it.confianca}">${it.confianca}</span></span>`;
@@ -189,15 +352,26 @@ function mostrarResultado(dados) {
 
   const avisosEl = document.getElementById("avisos");
   if (dados.avisos && dados.avisos.length) {
-    avisosEl.style.display = "block";
-    avisosEl.innerHTML = "<b>Avisos:</b><br>" + dados.avisos.map((a) => "• " + a).join("<br>");
+    avisosEl.style.display = "flex";
+    document.getElementById("avisosLista").innerHTML = dados.avisos.map((a) => `<div>• ${a}</div>`).join("");
   } else {
     avisosEl.style.display = "none";
   }
 
-  document.getElementById("resultado").style.display = "block";
-  document.getElementById("status").style.display = "none";
-  document.getElementById("dropzone").style.display = "none";
+  const naoMapEl = document.getElementById("naoMapeados");
+  if (dados.nao_mapeados && dados.nao_mapeados.length) {
+    naoMapEl.style.display = "flex";
+    const intro = `<div style="margin-bottom:4px">${dados.nao_mapeados.length} item(ns) ainda sem linha certa na planilha — vão para uma área separada no arquivo baixado, para você revisar e lançar manualmente:</div>`;
+    const linhas = dados.nao_mapeados.map((it) =>
+      `<div>• ${it.regime} — ${it.codigo} ${it.descricao}: R$ ${it.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</div>`
+    ).join("");
+    document.getElementById("naoMapeadosLista").innerHTML = intro + linhas;
+  } else {
+    naoMapEl.style.display = "none";
+  }
+
+  ocultarTodos();
+  document.getElementById("resultado").style.display = DISPLAY.resultado;
 }
 
 async function aplicar() {
@@ -230,8 +404,8 @@ async function aplicar() {
     a.remove();
     URL.revokeObjectURL(url);
 
-    document.getElementById("resultado").style.display = "none";
-    document.getElementById("sucesso").style.display = "block";
+    ocultarTodos();
+    document.getElementById("sucesso").style.display = DISPLAY.sucesso;
     document.getElementById("sucessoDetalhe").textContent =
       `${totalAplicado} valores preenchidos no arquivo baixado.` +
       (baixaConfianca
@@ -249,10 +423,8 @@ async function aplicar() {
 function reiniciar() {
   arquivoAtual = null;
   inputArquivo.value = "";
-  document.getElementById("dropzone").style.display = "block";
-  document.getElementById("resultado").style.display = "none";
-  document.getElementById("sucesso").style.display = "none";
-  document.getElementById("erro").style.display = "none";
+  ocultarTodos();
+  document.getElementById("dropzone").style.display = DISPLAY.dropzone;
 }
 </script>
 </body>
