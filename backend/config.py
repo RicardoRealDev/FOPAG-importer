@@ -70,6 +70,21 @@ ENCARGOS_FUNDO_TO_CELL = {
 ENCARGOS_SECTION_TITLE = "ENCARGOS SOCIAIS - GERAL"
 
 # ---------------------------------------------------------------------------
+# 4) RENDIMENTOS E DESCONTOS (GTO0001R) -> IRRF retido por regime
+# ---------------------------------------------------------------------------
+# Cada regime tem uma pagina "DESCONTOS" com uma linha "3014 - IRRF". O
+# valor na coluna "Total" dessa linha e' o IRRF retido daquele regime.
+# "RESUMO GERAL" (agregado de todos os regimes) e' ignorado, senao conta em
+# dobro.
+IRRF_REGIME_TO_CELL = {
+    "RESUMO CONTRATO TEMPORARIO": "I15",
+    "RESUMO ATIVOS - REGIME PRÓPRIO": "I30",
+    "RESUMO ATIVOS - REGIME GERAL": "I44",
+    "RESUMO MILITARES": "I58",
+}
+IRRF_LINHA_DESCRICAO = "3014 - IRRF"
+
+# ---------------------------------------------------------------------------
 # Registro de origem por celula (auditoria: de onde veio cada numero)
 # ---------------------------------------------------------------------------
 SOURCE_LABEL = "Importado automaticamente do relatório Ergon"
@@ -83,8 +98,8 @@ def celulas_gerenciadas() -> dict[str, list[str]]:
     0 de verdade em vez de continuar com o valor do mês anterior.
 
     NÃO inclui as células que o sistema ainda não sabe preencher sozinho
-    (detalhamento rubrica-por-rubrica, IRRF, NES) - essas continuam manuais
-    e não são tocadas aqui."""
+    (detalhamento rubrica-por-rubrica, NES) - essas continuam manuais e
+    não são tocadas aqui."""
     celulas: dict[str, set[str]] = {}
 
     def add(sheet, cell):
@@ -95,6 +110,9 @@ def celulas_gerenciadas() -> dict[str, list[str]]:
         add(SHEET_CONSIGNACOES, destino["consignacoes_resumo_cell"])
 
     for cell in ENCARGOS_FUNDO_TO_CELL.values():
+        add(SHEET_LIQUIDO, cell)
+
+    for cell in IRRF_REGIME_TO_CELL.values():
         add(SHEET_LIQUIDO, cell)
 
     for col in set(CONSIGNACOES_REGIME_TO_COLUMN.values()):

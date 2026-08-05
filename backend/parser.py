@@ -316,3 +316,75 @@ def parse_encargos(pages: list[str]) -> ResultadoParse:
         if f not in encontrados:
             resultado.avisos.append(f"Não encontrei o total de '{f}' em ENCARGOS SOCIAIS - GERAL.")
     return resultado
+
+
+# ---------------------------------------------------------------------------
+# 4) RENDIMENTOS E DESCONTOS -> IRRF retido por regime
+# ---------------------------------------------------------------------------
+# Layout observado (relatorio GTO0001R, pagina "DESCONTOS" de cada regime):
+# as descricoes ("codigo - nome", ex: "3014 - IRRF") vem ANTES dos numeros
+# (ao contrario do RESUMO DE CONSIGNAÇÕES, onde vem depois). Depois delas,
+# 3 pares de colunas Quant/Valor (Normal, Diferença, Devolução) e por fim
+# uma coluna "Total" - todas com N valores, N = quantidade de linhas de
+# descricao. O IRRF e' so' mais uma dessas N linhas; usamos sua posicao
+# dentro do bloco de descricoes para achar seu valor na coluna Total.
+def _irrf_regime_cell(text: str) -> str | None:
+    if "RESUMO GERAL" in text:
+        return None  # agregado de todos os regimes - ignorar p/ nao contar em dobro
+    for titulo, cell in config.IRRF_REGIME_TO_CELL.items():
+        if titulo in text:
+            return cell
+    return None
+
+
+def parse_irrf(pages: list[str]) -> ResultadoParse:
+    resultado = ResultadoParse()
+    for page_num, text in enumerate(pages, start=1):
+        if "DESCONTOS" not in text or config.IRRF_LINHA_DESCRICAO not in text:
+            continue
+        cell = _irrf_regime_cell(text)
+        if cell is None:
+            continue
+
+        lines = [l.strip() for l in text.split("\n") if l.strip()]
+        if config.IRRF_LINHA_DESCRICAO not in lines:
+            resultado.avisos.append(f"Pág. {page_num}: achei '{config.IRRF_LINHA_DESCRICAO}' no texto mas não como linha isolada.")
+            continue
+        irrf_idx = lines.index(config.IRRF_LINHA_DESCRICAO)
+
+        # expande o bloco de descricoes (linhas "codigo - nome" contiguas)
+        start = irrf_idx
+        while start > 0 and INSTITUICAO_RE.match(lines[start - 1]):
+            start -= 1
+        end = irrf_idx
+        while end + 1 < len(lines) and INSTITUICAO_RE.match(lines[end + 1]):
+            end += 1
+        n = end - start + 1
+        pos = irrf_idx - start
+
+        # coleta os tokens numericos DEPOIS do bloco de descricoes: espera
+        # 7 grupos de tamanho n (Quant/Valor x3 + Total)
+        tokens = []
+        for l in lines[end + 1:]:
+            tipo = _classify(l)
+            if tipo:
+                tokens.append((tipo, _to_float(l) if tipo != "int" else int(l)))
+            if len(tokens) >= 7 * n:
+                break
+
+        if len(tokens) < 7 * n:
+            resultado.avisos.append(
+                f"Pág. {page_num}: esperava {7 * n} números para a seção de IRRF, achei {len(tokens)}."
+            )
+            continue
+
+        total_array = [v for (_t, v) in tokens[6 * n: 7 * n]]
+        valor_irrf = total_array[pos]
+        origem = f"Pág. {page_num} — RENDIMENTOS/DESCONTOS — {config.IRRF_LINHA_DESCRICAO}"
+        resultado.achados.append(Achado(config.SHEET_LIQUIDO, cell, valor_irrf, origem))
+
+    encontrados_cells = {a.cell for a in resultado.achados}
+    for cell in config.IRRF_REGIME_TO_CELL.values():
+        if cell not in encontrados_cells:
+            resultado.avisos.append(f"Não encontrei IRRF para a célula {cell} (pode ser R$ 0,00 esse mês, ou o relatório de RENDIMENTOS não veio no PDF).")
+    return resultado     

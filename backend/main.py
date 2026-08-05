@@ -47,7 +47,6 @@ def _ler_instituicoes(spreadsheet_id: str) -> dict[str, str]:
             out[str(config.CONSIGNACOES_ROW_START + i)] = row[0].strip()
     return out
 
-
 def _processar(pdf_bytes: bytes, spreadsheet_id: str) -> dict:
     pages = pdf_extract.extract_pages(pdf_bytes)
     instituicoes = _ler_instituicoes(spreadsheet_id)
@@ -55,10 +54,11 @@ def _processar(pdf_bytes: bytes, spreadsheet_id: str) -> dict:
     r1 = p.parse_credito_bancario(pages)
     r2 = p.parse_consignacoes(pages, instituicoes)
     r3 = p.parse_encargos(pages)
+    r4 = p.parse_irrf(pages)
     mes_ano_label = p.extrair_mes_ano(pages)
 
-    achados = r1.achados + r2.achados + r3.achados
-    avisos = r1.avisos + r2.avisos + r3.avisos
+    achados = r1.achados + r2.achados + r3.achados + r4.achados
+    avisos = r1.avisos + r2.avisos + r3.avisos + r4.avisos
     return {"achados": achados, "avisos": avisos, "mes_ano_label": mes_ano_label}
 
 
