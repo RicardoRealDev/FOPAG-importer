@@ -20,21 +20,29 @@ CREDITO_BANCARIO_REGIMES = {
         "liquido_total_cell": "H15",
         "consignacoes_resumo_cell": "D3",
         "liquido_atual_cell": "G6",
+        "liquido_anterior_linha": "11",
+        "liquido_indenizacoes_linha": "14",
     },
     "ATIVOS - REGIME PRÓPRIO DE PREVIDÊNCIA SOCIAL": {
         "liquido_total_cell": "H30",
         "consignacoes_resumo_cell": "D4",
         "liquido_atual_cell": "G28",
+        "liquido_anterior_linha": "26",
+        "liquido_indenizacoes_linha": "29",
     },
     "ATIVOS - REGIME GERAL DE PREVIDÊNCIA SOCIAL": {
         "liquido_total_cell": "H44",
         "consignacoes_resumo_cell": "D5",
         "liquido_atual_cell": "G35",
+        "liquido_anterior_linha": "41",
+        "liquido_indenizacoes_linha": "43",
     },
     "MILITARES - REGIME DE PREVIDENCIA MILITARES": {
         "liquido_total_cell": "H58",
         "consignacoes_resumo_cell": "D6",
         "liquido_atual_cell": "G49",
+        "liquido_anterior_linha": "55",
+        "liquido_indenizacoes_linha": "57",
     },
 }
 # "liquido_atual_cell": a linha de "Vencimento/Subsídio atual" de cada bloco
@@ -44,6 +52,16 @@ CREDITO_BANCARIO_REGIMES = {
 # realmente liquidado) não bate com nenhum numero dos relatorios que
 # recebemos até agora - por isso só G é preenchido automaticamente aqui,
 # H fica em branco para lançamento manual (ver RENDIMENTOS_MAPEAMENTO abaixo).
+#
+# "liquido_anterior_linha"/"liquido_indenizacoes_linha": mesma lógica, mas
+# pras linhas "(Exercício Anterior) DEA" e "Indenizações" de cada bloco -
+# vêm do "Exercício Anterior" e "Indenizações" do mesmo relatório de
+# Crédito Bancário (os outros 2 dos 4 números que já líamos e
+# descartávamos). Confirmado exato contra a mesma planilha de julho.
+# DIFERENTE do "atual" acima: aqui G e H são sempre IGUAIS (confirmado),
+# e as fórmulas da aba NES puxam especificamente da coluna H - por isso
+# escrevemos nas DUAS colunas (G e H), não só em G.
+# continua manual).
 CREDITO_BANCARIO_GERAL_TITLE = "RESUMO DE CRÉDITO BANCÁRIO GERAL"
 CONSIGNACOES_TOTAL_GERAL_CELL = "D7"  # usado so' para conferencia/alerta
 
@@ -203,6 +221,17 @@ IRRF_REGIME_TO_CONSIGNACOES_CELL = {
     "RESUMO MILITARES": "H20",
 }
 
+# O IRRF também aparece espelhado na própria aba Líquido Folha, na coluna I
+# da linha "Vencimento/Subsídio atual" de cada regime (mesma linha do
+# liquido_atual_cell acima - ex: I28 pra RPPS, na mesma linha de G28).
+# Confirmado exato contra REL FOPAG JULHO-01.pdf.
+IRRF_REGIME_TO_LIQUIDO_MIRROR_CELL = {
+    "RESUMO CONTRATO TEMPORARIO": "I6",
+    "RESUMO ATIVOS - REGIME PRÓPRIO": "I28",
+    "RESUMO ATIVOS - REGIME GERAL": "I35",
+    "RESUMO MILITARES": "I49",
+}
+
 # ---------------------------------------------------------------------------
 # 5) RENDIMENTOS (GTO0001R, pagina "RENDIMENTOS" principal de cada regime)
 # -> detalhamento rubrica-por-rubrica da Liquido Folha
@@ -248,6 +277,7 @@ RENDIMENTOS_MAPEAMENTO = {
     },
     "RESUMO MILITARES": {
         "1026": "47",          # 13º Salário
+        "1023": "48",          # Adicional de Férias
         "1113": "51",          # Ressarcimento 40%
     },
 }

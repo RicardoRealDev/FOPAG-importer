@@ -197,6 +197,18 @@ def parse_credito_bancario(pages: list[str]) -> ResultadoParse:
                 config.SHEET_LIQUIDO, destino["liquido_atual_cell"], _atual,
                 f"{origem} — Exercício Atual",
             ))
+        if "liquido_anterior_linha" in destino:
+            for col in ("G", "H"):
+                resultado.achados.append(Achado(
+                    config.SHEET_LIQUIDO, f"{col}{destino['liquido_anterior_linha']}", _anterior,
+                    f"{origem} — Exercício Anterior",
+                ))
+        if "liquido_indenizacoes_linha" in destino:
+            for col in ("G", "H"):
+                resultado.achados.append(Achado(
+                    config.SHEET_LIQUIDO, f"{col}{destino['liquido_indenizacoes_linha']}", _indenizacoes,
+                    f"{origem} — Indenizações",
+                ))
 
     if total_geral_lido is not None:
         soma = sum(a.valor for a in resultado.achados if a.sheet == config.SHEET_CONSIGNACOES)
@@ -727,6 +739,9 @@ def parse_irrf(pages: list[str]) -> ResultadoParse:
         cell_consignacoes = config.IRRF_REGIME_TO_CONSIGNACOES_CELL.get(titulo)
         if cell_consignacoes:
             resultado.achados.append(Achado(config.SHEET_CONSIGNACOES, cell_consignacoes, valor_irrf, origem))
+        cell_liquido_mirror = config.IRRF_REGIME_TO_LIQUIDO_MIRROR_CELL.get(titulo)
+        if cell_liquido_mirror:
+            resultado.achados.append(Achado(config.SHEET_LIQUIDO, cell_liquido_mirror, valor_irrf, origem))
 
     encontrados_cells = {a.cell for a in resultado.achados}
     for cell in config.IRRF_REGIME_TO_CELL.values():
