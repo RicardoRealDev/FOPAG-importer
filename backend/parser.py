@@ -224,10 +224,11 @@ def _consignacoes_coluna(titulo: str) -> str | None:
     if titulo.strip().endswith("FACULTATIVAS - GERAL"):
         return None  # agregado - ignorar para nao contar em dobro
     if "CONTRATO TEMPORARIO" in titulo:
-        # Essas consignações pertencem à seção separada "Apropriação das
-        # Consignações - Contratos RGPS" (linhas 109-131), não ao bloco
-        # principal F:J. Ainda não mapeado — ver README "limitações".
-        return None
+        # Essas consignações vao pra' tabela separada "Apropriação das
+        # Consignações - Contratos RGPS" (linhas 109-119), não pro bloco
+        # principal F/G/H - "CONTRATO" e' um marcador especial tratado a
+        # parte em parse_consignacoes, não uma coluna de verdade.
+        return "CONTRATO"
     if "MILITARES" in titulo:
         return "H"
     if "REGIME PRÓPRIO" in titulo:
@@ -241,8 +242,8 @@ def parse_consignacoes(pages: list[str], sheet_institution_names: dict[str, str]
     """sheet_institution_names: {cell: nome_atual_na_planilha} - ex: {"27": "PLANSAÚDE COMPARTICIPAÇÃO", ...}"""
     resultado = ResultadoParse()
     title_re = re.compile(r"^RESUMO DE CONSIGNA.*FACULTATIVAS.*$", re.MULTILINE)
-    somas_fixas: dict[tuple[str, str], float] = {}
-    origens_fixas: dict[tuple[str, str], str] = {}
+    somas_fixas: dict[str, float] = {}
+    origens_fixas: dict[str, str] = {}
 
     for page_num, text in enumerate(pages, start=1):
         title_match = title_re.search(text)
@@ -295,12 +296,29 @@ def parse_consignacoes(pages: list[str], sheet_institution_names: dict[str, str]
             nome_limpo = re.sub(r"^\d+\s*-\s*", "", nome_pdf)
             origem = f"Pág. {page_num} — RESUMO DE CONSIGNAÇÕES — {nome_pdf}"
 
+            if coluna == "CONTRATO":
+                # tabela separada "Apropriação... Contratos RGPS": so' uma
+                # coluna de valor (F), nao tem fuzzy-match de fallback aqui
+                # porque sheet_institution_names e' da tabela principal
+                # (E14:E97), nao dessa (linhas 109-119).
+                linha_fixa = config.CONSIGNACOES_CONTRATO_MAPEAMENTO.get(normalize(nome_limpo))
+                if linha_fixa is None:
+                    resultado.avisos.append(
+                        f"Não encontrei instituição correspondente a '{nome_limpo}' na tabela de Contratos RGPS (pág. {page_num})."
+                    )
+                    continue
+                cell_final = f"F{linha_fixa}"
+                somas_fixas[cell_final] = somas_fixas.get(cell_final, 0.0) + valor
+                origens_fixas[cell_final] = origem
+                continue
+
             cell_fixo = config.CONSIGNACOES_MAPEAMENTO.get(coluna, {}).get(normalize(nome_limpo))
             if cell_fixo is None and codigo:
                 cell_fixo = config.CONSIGNACOES_CODIGO_MAPEAMENTO.get(coluna, {}).get(codigo)
             if cell_fixo is not None:
-                somas_fixas[(coluna, cell_fixo)] = somas_fixas.get((coluna, cell_fixo), 0.0) + valor
-                origens_fixas[(coluna, cell_fixo)] = origem
+                cell_final = f"{coluna}{cell_fixo}"
+                somas_fixas[cell_final] = somas_fixas.get(cell_final, 0.0) + valor
+                origens_fixas[cell_final] = origem
                 continue
 
             cell, score = find_best_match(nome_limpo, sheet_institution_names)
@@ -312,8 +330,8 @@ def parse_consignacoes(pages: list[str], sheet_institution_names: dict[str, str]
             confianca = "alta" if score > 0.85 else ("media" if score > 0.65 else "baixa")
             resultado.achados.append(Achado(config.SHEET_CONSIGNACOES, f"{coluna}{cell}", valor, origem, confianca))
 
-    for (coluna, cell), valor in somas_fixas.items():
-        resultado.achados.append(Achado(config.SHEET_CONSIGNACOES, f"{coluna}{cell}", valor, origens_fixas[(coluna, cell)]))
+    for cell_final, valor in somas_fixas.items():
+        resultado.achados.append(Achado(config.SHEET_CONSIGNACOES, cell_final, valor, origens_fixas[cell_final]))
     return resultado
 
 
@@ -494,6 +512,7 @@ def parse_fundos_segurado(pages: list[str]) -> ResultadoParse:
     _parse_fundos_rgps(pages, resultado)
     _parse_fundos_por_pagina_unica(pages, resultado, config.ENCARGOS_REGIME_RPPS_TITLE, config.CONSIGNACOES_FUNDOS_RPPS)
     _parse_fundos_por_pagina_unica(pages, resultado, config.ENCARGOS_REGIME_MILITAR_TITLE, config.CONSIGNACOES_FUNDOS_MILITAR)
+    _parse_fundos_por_pagina_unica(pages, resultado, config.ENCARGOS_REGIME_CONTRATO_TITLE, config.CONSIGNACOES_CONTRATO_FUNDOS)
     return resultado
 
 

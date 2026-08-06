@@ -112,6 +112,27 @@ CONSIGNACOES_CODIGO_MAPEAMENTO = {
 }
 
 # ---------------------------------------------------------------------------
+# 2c) "Apropriação das Consignações - Contratos RGPS" (segunda tabela da
+# aba Consignações, linhas ~109-119) -> consignações dos funcionários de
+# Contrato Temporário. Diferente do bloco principal (colunas F/G/H por
+# regime), aqui só existe UMA coluna de valor (F), porque é um regime só.
+# Confirmado contra REL FOPAG JULHO-01.pdf e uma planilha real de julho.
+# ---------------------------------------------------------------------------
+CONSIGNACOES_CONTRATO_MAPEAMENTO = {
+    "ZAHAV ADIANT SALARIO": "119",
+}
+CONSIGNACOES_CONTRATO_ROW_START = 109
+CONSIGNACOES_CONTRATO_ROW_END = 119
+
+# INSS dos Contratos vem do relatório de Encargos Sociais (GTO0002R,
+# seção específica de Contrato Temporário) - mesma técnica/formato usado
+# em CONSIGNACOES_FUNDOS_RPPS/MILITAR acima.
+ENCARGOS_REGIME_CONTRATO_TITLE = "ENCARGOS SOCIAIS - CONTRATO TEMPORARIO - REGIME GERAL DE PREVIDÊNCIA SOCIAL"
+CONSIGNACOES_CONTRATO_FUNDOS = [
+    ("I.N.S.S.", "F109", None),
+]
+
+# ---------------------------------------------------------------------------
 # 3) ENCARGOS SOCIAIS - GERAL (GTO0002R) -> encargos sociais consolidados
 # ---------------------------------------------------------------------------
 ENCARGOS_FUNDO_TO_CELL = {
@@ -175,6 +196,7 @@ IRRF_LINHA_DESCRICAO = "3014 - IRRF"
 # Contrato Temporario nao tem coluna dedicada nessa linha, por isso nao
 # entra aqui.
 IRRF_REGIME_TO_CONSIGNACOES_CELL = {
+    "RESUMO CONTRATO TEMPORARIO": "F111",  # tabela "Apropriação... Contratos RGPS"
     "RESUMO ATIVOS - REGIME PRÓPRIO": "F20",
     "RESUMO ATIVOS - REGIME GERAL": "G20",
     "RESUMO MILITARES": "H20",
@@ -266,6 +288,9 @@ def celulas_gerenciadas() -> dict[str, list[str]]:
     for col in set(CONSIGNACOES_REGIME_TO_COLUMN.values()):
         for row in range(CONSIGNACOES_ROW_START, CONSIGNACOES_ROW_END + 1):
             add(SHEET_CONSIGNACOES, f"{col}{row}")
+
+    for row in range(CONSIGNACOES_CONTRATO_ROW_START, CONSIGNACOES_CONTRATO_ROW_END + 1):
+        add(SHEET_CONSIGNACOES, f"F{row}")
 
     return {sheet: sorted(cells) for sheet, cells in celulas.items()}
 
