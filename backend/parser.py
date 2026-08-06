@@ -241,6 +241,8 @@ def parse_consignacoes(pages: list[str], sheet_institution_names: dict[str, str]
     """sheet_institution_names: {cell: nome_atual_na_planilha} - ex: {"27": "PLANSAÚDE COMPARTICIPAÇÃO", ...}"""
     resultado = ResultadoParse()
     title_re = re.compile(r"^RESUMO DE CONSIGNA.*FACULTATIVAS.*$", re.MULTILINE)
+    somas_fixas: dict[tuple[str, str], float] = {}
+    origens_fixas: dict[tuple[str, str], str] = {}
 
     for page_num, text in enumerate(pages, start=1):
         title_match = title_re.search(text)
@@ -288,9 +290,20 @@ def parse_consignacoes(pages: list[str], sheet_institution_names: dict[str, str]
         vlr_normal = [v for (_t, v) in tokens[pos: pos + n]]
 
         for nome_pdf, valor in zip(descricoes, vlr_normal):
+            m = _CODIGO_DESCRICAO_RE.match(nome_pdf)
+            codigo = m.group(1) if m else None
             nome_limpo = re.sub(r"^\d+\s*-\s*", "", nome_pdf)
-            cell, score = find_best_match(nome_limpo, sheet_institution_names)
             origem = f"Pág. {page_num} — RESUMO DE CONSIGNAÇÕES — {nome_pdf}"
+
+            cell_fixo = config.CONSIGNACOES_MAPEAMENTO.get(coluna, {}).get(normalize(nome_limpo))
+            if cell_fixo is None and codigo:
+                cell_fixo = config.CONSIGNACOES_CODIGO_MAPEAMENTO.get(coluna, {}).get(codigo)
+            if cell_fixo is not None:
+                somas_fixas[(coluna, cell_fixo)] = somas_fixas.get((coluna, cell_fixo), 0.0) + valor
+                origens_fixas[(coluna, cell_fixo)] = origem
+                continue
+
+            cell, score = find_best_match(nome_limpo, sheet_institution_names)
             if cell is None:
                 resultado.avisos.append(
                     f"Não encontrei instituição correspondente a '{nome_limpo}' na planilha (pág. {page_num})."
@@ -298,6 +311,9 @@ def parse_consignacoes(pages: list[str], sheet_institution_names: dict[str, str]
                 continue
             confianca = "alta" if score > 0.85 else ("media" if score > 0.65 else "baixa")
             resultado.achados.append(Achado(config.SHEET_CONSIGNACOES, f"{coluna}{cell}", valor, origem, confianca))
+
+    for (coluna, cell), valor in somas_fixas.items():
+        resultado.achados.append(Achado(config.SHEET_CONSIGNACOES, f"{coluna}{cell}", valor, origens_fixas[(coluna, cell)]))
     return resultado
 
 

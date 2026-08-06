@@ -62,6 +62,56 @@ CONSIGNACOES_ROW_END = 97
 CONSIGNACOES_SKIP_TITLES = ["GERAL"]
 
 # ---------------------------------------------------------------------------
+# 2b) RESUMO DE CONSIGNAÇÕES - mapeamento FIXO (nome normalizado -> linha),
+# por coluna/regime, pras instituições já confirmadas. Complementa o
+# find_best_match (comparação de texto) usado pras demais - quando o nome
+# bate aqui, usa direto, sem depender de score de similaridade.
+#
+# Construído cruzando REL FOPAG JULHO-01.pdf com os valores REAIS de uma
+# planilha de julho, casando por VALOR (não por nome) pra evitar erro -
+# só entrou aqui o que teve casamento numérico exato/único. Escopado por
+# coluna (F=RPPS, G=RGPS, H=Militar) porque a MESMA instituição pode cair
+# em linhas diferentes dependendo do regime (ex: Plansaúde Comparticipação
+# é linha 27 tanto em F quanto G, mas BRB-Banco de Brasília no Militar não
+# bateu com a mesma linha usada em F/G - por isso não entrou pra H).
+CONSIGNACOES_MAPEAMENTO = {
+    "F": {  # RPPS
+        "PLANSAUDE COMPARTICIPACAO": "27",
+        "BANCO DO BRASIL": "41",
+        "CAIXA DO TRABALHADOR": "56",
+        "SINPOL MENSALIDADE": "58",
+        "BANCO DAYCOVAL": "63",
+        "CIASPREV MENSALIDADE": "67",
+        "AJUSP TO": "85",
+        "BRB BANCO DE BRASILIA": "87",
+        "BRB BANCO DE BRASILIA PASSIVOS": "86",
+        "ASSECAD MENSALIDADE": "31",
+        "SISEPE MENSALIDADE": "52",
+    },
+    "G": {  # RGPS
+        "PLANSAUDE COMPARTICIPACAO": "27",
+        "PLANSAUDE DEPENDENTE INDIRETO": "28",
+        "ASSECAD MENSALIDADE": "31",
+        "BRADESCO EMPRESTIMO": "45",
+        "KARDBANK": "89",
+        "BRB BANCO DE BRASILIA": "87",
+        "ZAHAV ADIANT SALARIO": "90",
+    },
+    "H": {},  # Militar - nenhum nome confirmado ainda, ver CONSIGNACOES_CODIGO_MAPEAMENTO
+}
+
+# Casos em que o mesmo código Ergon cobre várias variantes que a planilha
+# soma numa única linha (ex: Plano de Saúde Militar tem 3 variantes -
+# Comparticipação/Mensalidade/Odontológico - todas com código "3059",
+# somadas na linha 26). Diferente do mapeamento acima, aqui a chave é o
+# código (não o nome), porque o nome varia mas o código não.
+CONSIGNACOES_CODIGO_MAPEAMENTO = {
+    "H": {
+        "3059": "26",
+    },
+}
+
+# ---------------------------------------------------------------------------
 # 3) ENCARGOS SOCIAIS - GERAL (GTO0002R) -> encargos sociais consolidados
 # ---------------------------------------------------------------------------
 ENCARGOS_FUNDO_TO_CELL = {
