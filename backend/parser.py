@@ -517,6 +517,152 @@ def parse_fundos_segurado(pages: list[str]) -> ResultadoParse:
 
 
 # ---------------------------------------------------------------------------
+# 7) Aba NES -> coluna FOLHA (E), só as naturezas com fonte confirmada
+# (ver config.NES_LINHA_* pra regra de cada linha - cada uma tem sua
+# própria combinação, não é uma soma genérica "por natureza").
+# ---------------------------------------------------------------------------
+def parse_nes(pages: list[str]) -> ResultadoParse:
+    resultado = ResultadoParse()
+    linha = lambda l: f"{config.NES_FOLHA_COL}{l}"  # noqa: E731
+
+    # --- linha 7: Rendimentos RPPS (G19, códigos 1026+1028) + Rendimentos RGPS (G33, código 1028) ---
+    r_rend = parse_rendimentos(pages)
+    por_cell = {a.cell: a.valor for a in r_rend.achados if a.sheet == config.SHEET_LIQUIDO}
+    if "G19" in por_cell and "G33" in por_cell:
+        resultado.achados.append(Achado(
+            config.SHEET_NES, linha(config.NES_LINHA_13_SALARIO_RPPS), por_cell["G19"] + por_cell["G33"],
+            "Rendimentos RPPS (G19) + Rendimentos RGPS (G33) — 13º Salário/Adiantamento",
+        ))
+    else:
+        resultado.avisos.append(f"NES: não encontrei G19 e/ou G33 (13º Salário) pra linha {config.NES_LINHA_13_SALARIO_RPPS}.")
+    if "G22" in por_cell:
+        resultado.achados.append(Achado(config.SHEET_NES, linha(config.NES_LINHA_FERIAS_RPPS), por_cell["G22"], "Rendimentos RPPS — código 1023 (Adicional de Férias)"))
+    else:
+        resultado.avisos.append(f"NES: não encontrei o Adicional de Férias RPPS (código 1023) pra linha {config.NES_LINHA_FERIAS_RPPS}.")
+
+    # --- linha 20: Encargos GERAL, Plansaúde, Contribuição do Estado (= F71) ---
+    r_enc = parse_encargos(pages)
+    plansaude = next((a.valor for a in r_enc.achados if a.cell == "F71"), None)
+    if plansaude is not None:
+        resultado.achados.append(Achado(config.SHEET_NES, linha(config.NES_LINHA_PLANSAUDE_PATRONAL), plansaude, "Encargos Sociais GERAL — Plansaúde (Contribuição do Estado)"))
+    else:
+        resultado.avisos.append(f"NES: não encontrei o Plansaúde patronal (GERAL) pra linha {config.NES_LINHA_PLANSAUDE_PATRONAL}.")
+
+    # --- linhas 18 e 19: Encargos RPPS, 2 fundos somados, Estado Anterior/Atual ---
+    soma_anterior, soma_atual, achou_rpps = 0.0, 0.0, False
+    pendentes = list(config.CONSIGNACOES_FUNDOS_RPPS)
+    for text in pages:
+        if not pendentes or config.ENCARGOS_REGIME_RPPS_TITLE not in text:
+            continue
+        lines = [l.strip() for l in text.split("\n") if l.strip()]
+        i = 0
+        while i < len(lines) and pendentes:
+            if lines[i] not in _ROTULOS_SUBTOTAL:
+                i += 1
+                continue
+            rotulos, valores = _bloco_subtotal_valores(lines, i)
+            k = len(rotulos)
+            if len(valores) < 4 * k:
+                i += max(k, 1)
+                continue
+            pendentes.pop(0)
+            estado = valores[k:2 * k]
+            if rotulos == ["Subtotal (ANTERIOR)", "Subtotal (ATUAL)"]:
+                soma_anterior += estado[0]
+                soma_atual += estado[1]
+            elif rotulos == ["Subtotal (ATUAL)"]:
+                soma_atual += estado[0]
+            achou_rpps = True
+            i += k
+    if achou_rpps:
+        origem = "Encargos Sociais RPPS — Fundo Financeiro + Fundo Previdenciário (Contribuição do Estado)"
+        resultado.achados.append(Achado(config.SHEET_NES, linha(config.NES_LINHA_OBRIGACOES_ANTERIOR_RPPS), soma_anterior, f"{origem}, exercício anterior"))
+        resultado.achados.append(Achado(config.SHEET_NES, linha(config.NES_LINHA_CONTRIB_PATRONAL_CIVIL_RPPS), soma_atual, f"{origem}, atual"))
+    else:
+        resultado.avisos.append(f"NES: não encontrei os fundos da RPPS em Encargos Sociais pras linhas {config.NES_LINHA_OBRIGACOES_ANTERIOR_RPPS}/{config.NES_LINHA_CONTRIB_PATRONAL_CIVIL_RPPS}.")
+
+    # --- linha 23: Encargos Militar, Fundo Financeiro, Estado Atual ---
+    pendentes_mil = list(config.CONSIGNACOES_FUNDOS_MILITAR)
+    achou_militar = False
+    for text in pages:
+        if not pendentes_mil or config.ENCARGOS_REGIME_MILITAR_TITLE not in text:
+            continue
+        lines = [l.strip() for l in text.split("\n") if l.strip()]
+        i = 0
+        while i < len(lines) and pendentes_mil:
+            if lines[i] not in _ROTULOS_SUBTOTAL:
+                i += 1
+                continue
+            rotulos, valores = _bloco_subtotal_valores(lines, i)
+            k = len(rotulos)
+            if len(valores) < 4 * k:
+                i += max(k, 1)
+                continue
+            pendentes_mil.pop(0)
+            estado = valores[k:2 * k]
+            resultado.achados.append(Achado(config.SHEET_NES, linha(config.NES_LINHA_FUNDO_GOIAS), estado[-1], "Encargos Sociais Militar — Fundo Financeiro (Contribuição do Estado)"))
+            achou_militar = True
+            i += k
+    if not achou_militar:
+        resultado.avisos.append(f"NES: não encontrei o fundo da Militar em Encargos Sociais pra linha {config.NES_LINHA_FUNDO_GOIAS}.")
+
+    # --- linha 16: Encargos RGPS-ativos, INSS, Contribuição do Estado ---
+    achou_rgps = False
+    for text in pages:
+        if config.ENCARGOS_REGIME_RGPS_TITLE not in text:
+            continue
+        lines = [l.strip() for l in text.split("\n") if l.strip()]
+        idx = next((i for i, l in enumerate(lines) if l in _ROTULOS_SUBTOTAL), None)
+        if idx is None:
+            continue
+        rotulos, valores = _bloco_subtotal_valores(lines, idx)
+        k = len(rotulos)
+        alvo = config.CONSIGNACOES_FUNDOS_RGPS  # [("I.N.S.S.", ...), ("PLANSAUDE", ...)]
+        if k != len(alvo) or len(valores) < 4 * k:
+            break
+        estado = valores[k:2 * k]
+        resultado.achados.append(Achado(config.SHEET_NES, linha(config.NES_LINHA_INSS_RGPS), estado[0], "Encargos Sociais RGPS — INSS (Contribuição do Estado)"))
+        achou_rgps = True
+        break
+    if not achou_rgps:
+        resultado.avisos.append(f"NES: não encontrei o INSS da RGPS em Encargos Sociais pra linha {config.NES_LINHA_INSS_RGPS}.")
+
+    # --- linhas 12 e 15: Crédito Bancário - Exercício Anterior (RPPS) e soma de Indenizações ---
+    achou_rpps_cb = False
+    soma_indenizacoes, regimes_somados = 0.0, []
+    for page_num, text in enumerate(pages, start=1):
+        if CREDITO_BANCARIO_ANCHOR not in text:
+            continue
+        lines = [l.strip() for l in text.split("\n")]
+        if "DETALHES" not in lines:
+            continue
+        idx = lines.index("DETALHES")
+        valores = [_to_float(l) for l in lines[idx + 2: idx + 7] if MONEY_RE.match(l)]
+        if len(valores) < 4:
+            continue
+        _atual, anterior, indenizacoes, _total = valores[-4:]
+        if config.CREDITO_BANCARIO_GERAL_TITLE in text:
+            continue
+        titulo_regime = next((t for t in config.CREDITO_BANCARIO_REGIMES if t in text), None)
+        if titulo_regime is None:
+            continue
+        if titulo_regime == "ATIVOS - REGIME PRÓPRIO DE PREVIDÊNCIA SOCIAL":
+            resultado.achados.append(Achado(config.SHEET_NES, linha(config.NES_LINHA_VENC_ANTERIOR_RPPS), anterior, f"Pág. {page_num} — Crédito Bancário RPPS — Exercício Anterior"))
+            achou_rpps_cb = True
+        if titulo_regime != "MILITARES - REGIME DE PREVIDENCIA MILITARES":
+            soma_indenizacoes += indenizacoes
+            regimes_somados.append(titulo_regime)
+    if not achou_rpps_cb:
+        resultado.avisos.append(f"NES: não encontrei o Crédito Bancário da RPPS pra linha {config.NES_LINHA_VENC_ANTERIOR_RPPS}.")
+    if len(regimes_somados) == 3:
+        resultado.achados.append(Achado(config.SHEET_NES, linha(config.NES_LINHA_INDENIZACOES), soma_indenizacoes, "Crédito Bancário — soma Indenizações (Contrato + RPPS + RGPS)"))
+    else:
+        resultado.avisos.append(f"NES: esperava 3 regimes (Contrato+RPPS+RGPS) pra somar Indenizações da linha {config.NES_LINHA_INDENIZACOES}, achei {len(regimes_somados)}.")
+
+    return resultado
+
+
+# ---------------------------------------------------------------------------
 # 4) RENDIMENTOS E DESCONTOS -> IRRF retido por regime
 # ---------------------------------------------------------------------------
 # Layout observado (relatorio GTO0001R, pagina "DESCONTOS" de cada regime):

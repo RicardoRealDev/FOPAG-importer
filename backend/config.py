@@ -10,6 +10,7 @@ codigo.
 
 SHEET_LIQUIDO = "LÍQUIDO FOLHA -1"
 SHEET_CONSIGNACOES = "CONSIGNAÇÕES FOLHA 1"
+SHEET_NES = "NES"
 
 # ---------------------------------------------------------------------------
 # 1) RESUMO DE CRÉDITO BANCÁRIO (GTO0003R) -> totais liquidos por regime
@@ -232,6 +233,7 @@ RENDIMENTOS_MAPEAMENTO = {
     },
     "RESUMO ATIVOS - REGIME PRÓPRIO": {
         "1026": "19",          # 13º Salário
+        "1028": "19",          # Adiantamento de 13º Salário (confirmado: soma com 1026 em G19)
         "1023": "22",          # Adicional de Férias
         "1319": "23",          # Auxílio Alimentação
         "1311": "24",          # Ressarcimento 30%
@@ -255,6 +257,31 @@ RENDIMENTOS_NAO_MAPEADOS_LINHA_INICIAL = 130
 RENDIMENTOS_NAO_MAPEADOS_LINHA_FINAL = 250  # limpo até aqui antes de escrever, para não sobrar lixo de mes anterior
 
 # ---------------------------------------------------------------------------
+# 6) Aba NES ("Nº NE" / Notas de Empenho) -> coluna FOLHA (E)
+# ---------------------------------------------------------------------------
+# A aba NES lista o valor da folha por código de natureza orçamentária. As
+# colunas "Nº NE" e "SALDO" são dados do sistema orçamentário (não vêm no
+# relatório de folha) - continuam manuais. A coluna "FOLHA" (E) é sempre
+# vazia no modelo - é o slot que este sistema preenche.
+#
+# Confirmado cruzando REL FOPAG JULHO-01.pdf com uma planilha real de
+# julho: pra cada natureza abaixo, o valor bate EXATO com uma combinação
+# específica de dados que já extraímos de outros relatórios (não é uma
+# soma simples "por natureza" - cada linha tem sua própria regra, documentada
+# em parser.py:parse_nes). Só entrou aqui o que bateu exato - as demais
+# naturezas da aba continuam manuais.
+NES_FOLHA_COL = "E"
+NES_LINHA_13_SALARIO_RPPS = "7"          # Rendimentos RPPS (G19) + Rendimentos RGPS (G33)
+NES_LINHA_FERIAS_RPPS = "8"              # Rendimentos RPPS, código 1023 (mesma fonte de G22)
+NES_LINHA_VENC_ANTERIOR_RPPS = "12"      # Crédito Bancário RPPS - "Exercício Anterior"
+NES_LINHA_INDENIZACOES = "15"            # Crédito Bancário - soma "Indenizações" de Contrato+RPPS+RGPS (exclui Militar)
+NES_LINHA_INSS_RGPS = "16"               # Encargos Sociais RGPS - INSS, Contribuição do Estado
+NES_LINHA_OBRIGACOES_ANTERIOR_RPPS = "18"  # Encargos RPPS - 2 fundos somados, Contribuição do Estado, Anterior
+NES_LINHA_CONTRIB_PATRONAL_CIVIL_RPPS = "19"  # Encargos RPPS - 2 fundos somados, Contribuição do Estado, Atual
+NES_LINHA_PLANSAUDE_PATRONAL = "20"      # Encargos GERAL - Plansaúde, Contribuição do Estado (mesma fonte de F71)
+NES_LINHA_FUNDO_GOIAS = "23"             # Encargos Militar - Fundo Financeiro, Contribuição do Estado, Atual
+
+# ---------------------------------------------------------------------------
 # Registro de origem por celula (auditoria: de onde veio cada numero)
 # ---------------------------------------------------------------------------
 SOURCE_LABEL = "Importado automaticamente do relatório Ergon"
@@ -268,8 +295,8 @@ def celulas_gerenciadas() -> dict[str, list[str]]:
     0 de verdade em vez de continuar com o valor do mês anterior.
 
     NÃO inclui as células que o sistema ainda não sabe preencher sozinho
-    (detalhamento rubrica-por-rubrica não mapeado, NES) - essas continuam
-    manuais e não são tocadas aqui."""
+    (detalhamento rubrica-por-rubrica não mapeado, maioria da aba NES) -
+    essas continuam manuais e não são tocadas aqui."""
     celulas: dict[str, set[str]] = {}
 
     def add(sheet, cell):
@@ -291,6 +318,13 @@ def celulas_gerenciadas() -> dict[str, list[str]]:
 
     for row in range(CONSIGNACOES_CONTRATO_ROW_START, CONSIGNACOES_CONTRATO_ROW_END + 1):
         add(SHEET_CONSIGNACOES, f"F{row}")
+
+    for linha in (
+        NES_LINHA_13_SALARIO_RPPS, NES_LINHA_FERIAS_RPPS, NES_LINHA_VENC_ANTERIOR_RPPS,
+        NES_LINHA_INDENIZACOES, NES_LINHA_INSS_RGPS, NES_LINHA_OBRIGACOES_ANTERIOR_RPPS,
+        NES_LINHA_CONTRIB_PATRONAL_CIVIL_RPPS, NES_LINHA_PLANSAUDE_PATRONAL, NES_LINHA_FUNDO_GOIAS,
+    ):
+        add(SHEET_NES, f"{NES_FOLHA_COL}{linha}")
 
     return {sheet: sorted(cells) for sheet, cells in celulas.items()}
 
