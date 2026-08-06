@@ -192,6 +192,11 @@ def parse_credito_bancario(pages: list[str]) -> ResultadoParse:
         origem = f"Pág. {page_num} — RESUMO DE CRÉDITO BANCÁRIO"
         resultado.achados.append(Achado(config.SHEET_LIQUIDO, destino["liquido_total_cell"], total, origem))
         resultado.achados.append(Achado(config.SHEET_CONSIGNACOES, destino["consignacoes_resumo_cell"], total, origem))
+        if "liquido_atual_cell" in destino:
+            resultado.achados.append(Achado(
+                config.SHEET_LIQUIDO, destino["liquido_atual_cell"], _atual,
+                f"{origem} — Exercício Atual",
+            ))
 
     if total_geral_lido is not None:
         soma = sum(a.valor for a in resultado.achados if a.sheet == config.SHEET_CONSIGNACOES)

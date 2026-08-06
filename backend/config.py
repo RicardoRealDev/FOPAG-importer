@@ -18,20 +18,31 @@ CREDITO_BANCARIO_REGIMES = {
     "CONTRATO TEMPORARIO - REGIME GERAL DE PREVIDÊNCIA SOCIAL": {
         "liquido_total_cell": "H15",
         "consignacoes_resumo_cell": "D3",
+        "liquido_atual_cell": "G6",
     },
     "ATIVOS - REGIME PRÓPRIO DE PREVIDÊNCIA SOCIAL": {
         "liquido_total_cell": "H30",
         "consignacoes_resumo_cell": "D4",
+        "liquido_atual_cell": "G28",
     },
     "ATIVOS - REGIME GERAL DE PREVIDÊNCIA SOCIAL": {
         "liquido_total_cell": "H44",
         "consignacoes_resumo_cell": "D5",
+        "liquido_atual_cell": "G35",
     },
     "MILITARES - REGIME DE PREVIDENCIA MILITARES": {
         "liquido_total_cell": "H58",
         "consignacoes_resumo_cell": "D6",
+        "liquido_atual_cell": "G49",
     },
 }
+# "liquido_atual_cell": a linha de "Vencimento/Subsídio atual" de cada bloco
+# (6/28/35/49) tem colunas G e H DIFERENTES entre si (confirmado comparando
+# REL FOPAG JULHO-01.pdf com uma planilha real de julho): G bate exatamente
+# com "Exercício Atual" do Resumo de Crédito Bancário (GTO0003R); H (o valor
+# realmente liquidado) não bate com nenhum numero dos relatorios que
+# recebemos até agora - por isso só G é preenchido automaticamente aqui,
+# H fica em branco para lançamento manual (ver RENDIMENTOS_MAPEAMENTO abaixo).
 CREDITO_BANCARIO_GERAL_TITLE = "RESUMO DE CRÉDITO BANCÁRIO GERAL"
 CONSIGNACOES_TOTAL_GERAL_CELL = "D7"  # usado so' para conferencia/alerta
 
@@ -85,9 +96,15 @@ IRRF_LINHA_DESCRICAO = "3014 - IRRF"
 #
 # Quando dois codigos apontam pra mesma linha (ex: 1027+1028), os valores
 # sao somados.
+#
+# ATENCAO: os codigos "1201" (linha 6) e "1001" (linha 28) foram REMOVIDOS
+# de propósito - essas linhas usam a coluna G vinda do Crédito Bancário
+# (ver CREDITO_BANCARIO_REGIMES."liquido_atual_cell" acima), e o "Total" do
+# relatório de Rendimentos NÃO bate nem com G nem com H nessas linhas.
+# Esses codigos continuam aparecendo na tabela de "não mapeados" para
+# conferência manual - não apague-os de lá sem investigar antes.
 RENDIMENTOS_MAPEAMENTO = {
     "RESUMO CONTRATO TEMPORARIO": {
-        "1201": "6",           # Vencimento Contratado -> Despesas Remuneração
         "1027": "7",           # 13º Salário Proporcional
         "1028": "7",           # Adiantamento de 13º Salário
         "1204": "9",           # Férias Proporcionais Indenizadas
@@ -101,7 +118,6 @@ RENDIMENTOS_MAPEAMENTO = {
         "1311": "24",          # Ressarcimento 30%
         "1113": "25",          # Ressarcimento 40%
         "1002": "27",          # Subsídio
-        "1001": "28",          # Vencimento
     },
     "RESUMO ATIVOS - REGIME GERAL": {
         "1028": "33",          # Adiantamento de 13º Salário
