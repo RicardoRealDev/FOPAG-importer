@@ -275,6 +275,25 @@
   #sucesso button { width: 100%; background: hsl(var(--muted)); color: hsl(var(--foreground)); border: 1px solid hsl(var(--border)); }
   #sucesso button:hover { background: hsl(var(--border)); }
 
+  .limitacoes {
+    position: relative; z-index: 1; margin-top: 20px;
+    border: 1px solid hsl(var(--border)); border-radius: calc(var(--radius) - 8px);
+    overflow: hidden; font-size: 0.8125rem;
+  }
+  .limitacoes summary {
+    list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px;
+    padding: 12px 16px; color: hsl(var(--muted-foreground)); font-weight: 600;
+  }
+  .limitacoes summary::-webkit-details-marker { display: none; }
+  .limitacoes summary .icon { width: 15px; height: 15px; color: hsl(var(--warning)); flex-shrink: 0; }
+  .limitacoes summary .chev { width: 14px; height: 14px; margin-left: auto; color: hsl(var(--muted-foreground)); transition: transform .15s; flex-shrink: 0; }
+  .limitacoes[open] summary .chev { transform: rotate(180deg); }
+  .limitacoes-corpo { padding: 0 16px 14px 39px; color: hsl(var(--muted-foreground)); }
+  .limitacoes-corpo ul { margin: 0; padding-left: 16px; }
+  .limitacoes-corpo li { margin-bottom: 7px; line-height: 1.5; }
+  .limitacoes-corpo li:last-child { margin-bottom: 0; }
+  .limitacoes-corpo strong { color: hsl(var(--foreground)); font-weight: 600; }
+
 </style>
 </head>
 <body>
@@ -365,6 +384,23 @@
       <button type="button" onclick="reiniciar()">Importar outro relatório</button>
     </div>
   </div>
+
+  <details class="limitacoes">
+    <summary>
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><path d="M12 9v4M12 17h.01" stroke-linecap="round"/></svg>
+      <span>Partes ainda não mapeadas automaticamente</span>
+      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </summary>
+    <div class="limitacoes-corpo">
+      <ul>
+        <li><strong>Coluna "Liquidação"</strong> das linhas de Vencimento/Subsídio atual (Líquido Folha) — sem fonte identificada nos relatórios do Ergon recebidos até agora; sempre manual.</li>
+        <li><strong>Algumas instituições da coluna Militar</strong> (Consignações) — ainda sem mapeamento fixo confirmado; dependem de conferência manual.</li>
+        <li><strong>"BRB Auxílio Alimentação"</strong> (tabela de Contratos RGPS) — tem valor em alguns meses, mas a fonte ainda não foi identificada.</li>
+        <li><strong>Rubricas residuais de Rendimentos</strong> sem mapeamento — aparecem listadas na tela de revisão e no arquivo baixado para lançamento manual.</li>
+        <li><strong>Sub-relatórios "Exercícios Anteriores" e "Indenizações"</strong> de Rendimentos, e a <strong>aba NES</strong> (parcialmente automatizada) — ainda não totalmente lidos.</li>
+      </ul>
+    </div>
+  </details>
 
 </div>
 
