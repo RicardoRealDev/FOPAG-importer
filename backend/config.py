@@ -120,6 +120,16 @@ IRRF_REGIME_TO_CELL = {
 }
 IRRF_LINHA_DESCRICAO = "3014 - IRRF"
 
+# O mesmo IRRF tambem aparece na linha 20 da aba Consignacoes (F/G/H) -
+# confirmado que e' o MESMO valor, so' espelhado numa segunda celula.
+# Contrato Temporario nao tem coluna dedicada nessa linha, por isso nao
+# entra aqui.
+IRRF_REGIME_TO_CONSIGNACOES_CELL = {
+    "RESUMO ATIVOS - REGIME PRÓPRIO": "F20",
+    "RESUMO ATIVOS - REGIME GERAL": "G20",
+    "RESUMO MILITARES": "H20",
+}
+
 # ---------------------------------------------------------------------------
 # 5) RENDIMENTOS (GTO0001R, pagina "RENDIMENTOS" principal de cada regime)
 # -> detalhamento rubrica-por-rubrica da Liquido Folha
