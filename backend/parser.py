@@ -528,14 +528,52 @@ def parse_fundos_segurado(pages: list[str]) -> ResultadoParse:
     return resultado
 
 
+def _ler_fundos_estado(pages: list[str], regime_title: str, fundos: list) -> dict[str, tuple[float | None, float]]:
+    """Como _parse_fundos_por_pagina_unica, mas devolve a Contribuição do
+    Estado (não Segurado) de cada fundo em `fundos`, na forma
+    {nome_fundo: (estado_anterior_ou_None, estado_atual)}."""
+    pendentes = list(fundos)
+    encontrados: dict[str, tuple[float | None, float]] = {}
+    for text in pages:
+        if not pendentes or regime_title not in text:
+            continue
+        lines = [l.strip() for l in text.split("\n") if l.strip()]
+        i = 0
+        while i < len(lines) and pendentes:
+            if lines[i] not in _ROTULOS_SUBTOTAL:
+                i += 1
+                continue
+            rotulos, valores = _bloco_subtotal_valores(lines, i)
+            k = len(rotulos)
+            if len(valores) < 4 * k:
+                i += max(k, 1)
+                continue
+            nome, _cell_atual, _cell_anterior = pendentes.pop(0)
+            estado = valores[k:2 * k]
+            if rotulos == ["Subtotal (ANTERIOR)", "Subtotal (ATUAL)"]:
+                encontrados[nome] = (estado[0], estado[1])
+            elif rotulos == ["Subtotal (ATUAL)"]:
+                encontrados[nome] = (None, estado[0])
+            i += k
+    return encontrados
+
+
 # ---------------------------------------------------------------------------
 # 7) Aba NES -> coluna FOLHA (E), só as naturezas com fonte confirmada
 # (ver config.NES_LINHA_* pra regra de cada linha - cada uma tem sua
-# própria combinação, não é uma soma genérica "por natureza").
+# própria combinação, não é uma soma genérica "por natureza"). De quebra,
+# espelha os mesmos números na área de detalhe de Encargos Sociais dentro
+# da aba Consignações (linhas 139-208 - ver config.CONSIGNACOES_ENCARGOS_
+# DETALHE), de onde as fórmulas da NES realmente puxam o valor de SALDO.
 # ---------------------------------------------------------------------------
 def parse_nes(pages: list[str]) -> ResultadoParse:
     resultado = ResultadoParse()
     linha = lambda l: f"{config.NES_FOLHA_COL}{l}"  # noqa: E731
+
+    def add_consig(chave: str, valor: float, origem: str) -> None:
+        cell = config.CONSIGNACOES_ENCARGOS_DETALHE.get(chave)
+        if cell:
+            resultado.achados.append(Achado(config.SHEET_CONSIGNACOES, cell, valor, origem))
 
     # --- linha 7: Rendimentos RPPS (G19, códigos 1026+1028) + Rendimentos RGPS (G33, código 1028) ---
     r_rend = parse_rendimentos(pages)
@@ -552,71 +590,56 @@ def parse_nes(pages: list[str]) -> ResultadoParse:
     else:
         resultado.avisos.append(f"NES: não encontrei o Adicional de Férias RPPS (código 1023) pra linha {config.NES_LINHA_FERIAS_RPPS}.")
 
-    # --- linha 20: Encargos GERAL, Plansaúde, Contribuição do Estado (= F71) ---
+    # --- linha 20 (NES) + F176 (Consignações): Encargos GERAL, Plansaúde, Contribuição do Estado (= F71) ---
     r_enc = parse_encargos(pages)
     plansaude = next((a.valor for a in r_enc.achados if a.cell == "F71"), None)
     if plansaude is not None:
-        resultado.achados.append(Achado(config.SHEET_NES, linha(config.NES_LINHA_PLANSAUDE_PATRONAL), plansaude, "Encargos Sociais GERAL — Plansaúde (Contribuição do Estado)"))
+        origem = "Encargos Sociais GERAL — Plansaúde (Contribuição do Estado)"
+        resultado.achados.append(Achado(config.SHEET_NES, linha(config.NES_LINHA_PLANSAUDE_PATRONAL), plansaude, origem))
+        add_consig("plansaude_atual", plansaude, origem)
     else:
         resultado.avisos.append(f"NES: não encontrei o Plansaúde patronal (GERAL) pra linha {config.NES_LINHA_PLANSAUDE_PATRONAL}.")
 
-    # --- linhas 18 e 19: Encargos RPPS, 2 fundos somados, Estado Anterior/Atual ---
-    soma_anterior, soma_atual, achou_rpps = 0.0, 0.0, False
-    pendentes = list(config.CONSIGNACOES_FUNDOS_RPPS)
-    for text in pages:
-        if not pendentes or config.ENCARGOS_REGIME_RPPS_TITLE not in text:
-            continue
-        lines = [l.strip() for l in text.split("\n") if l.strip()]
-        i = 0
-        while i < len(lines) and pendentes:
-            if lines[i] not in _ROTULOS_SUBTOTAL:
-                i += 1
-                continue
-            rotulos, valores = _bloco_subtotal_valores(lines, i)
-            k = len(rotulos)
-            if len(valores) < 4 * k:
-                i += max(k, 1)
-                continue
-            pendentes.pop(0)
-            estado = valores[k:2 * k]
-            if rotulos == ["Subtotal (ANTERIOR)", "Subtotal (ATUAL)"]:
-                soma_anterior += estado[0]
-                soma_atual += estado[1]
-            elif rotulos == ["Subtotal (ATUAL)"]:
-                soma_atual += estado[0]
-            achou_rpps = True
-            i += k
-    if achou_rpps:
-        origem = "Encargos Sociais RPPS — Fundo Financeiro + Fundo Previdenciário (Contribuição do Estado)"
-        resultado.achados.append(Achado(config.SHEET_NES, linha(config.NES_LINHA_OBRIGACOES_ANTERIOR_RPPS), soma_anterior, f"{origem}, exercício anterior"))
-        resultado.achados.append(Achado(config.SHEET_NES, linha(config.NES_LINHA_CONTRIB_PATRONAL_CIVIL_RPPS), soma_atual, f"{origem}, atual"))
+    # --- linhas 18 e 19 (NES) + F146/F153/F161/F169 (Consignações): Encargos RPPS, 2 fundos ---
+    fundos_rpps = _ler_fundos_estado(pages, config.ENCARGOS_REGIME_RPPS_TITLE, config.CONSIGNACOES_FUNDOS_RPPS)
+    if fundos_rpps:
+        origem = "Encargos Sociais RPPS — {} (Contribuição do Estado)"
+        soma_anterior = sum(v[0] or 0.0 for v in fundos_rpps.values())
+        soma_atual = sum(v[1] for v in fundos_rpps.values())
+        resultado.achados.append(Achado(config.SHEET_NES, linha(config.NES_LINHA_OBRIGACOES_ANTERIOR_RPPS), soma_anterior, origem.format("Fundo Financeiro + Fundo Previdenciário") + ", exercício anterior"))
+        resultado.achados.append(Achado(config.SHEET_NES, linha(config.NES_LINHA_CONTRIB_PATRONAL_CIVIL_RPPS), soma_atual, origem.format("Fundo Financeiro + Fundo Previdenciário") + ", atual"))
+        financeiro = fundos_rpps.get("FUNDO DE PREVIDENCIA (FUNDO FINANCEIRO)")
+        previdenciario = fundos_rpps.get("FUNDO DE PREVIDENCIA (FUNDO PREVIDENCIÁRIO)")
+        if financeiro:
+            if financeiro[0] is not None:
+                add_consig("rpps_fundo_financeiro_anterior", financeiro[0], origem.format("Fundo Financeiro") + ", exercício anterior")
+            add_consig("rpps_fundo_financeiro_atual", financeiro[1], origem.format("Fundo Financeiro") + ", atual")
+        if previdenciario:
+            if previdenciario[0] is not None:
+                add_consig("rpps_fundo_previdenciario_anterior", previdenciario[0], origem.format("Fundo Previdenciário") + ", exercício anterior")
+            add_consig("rpps_fundo_previdenciario_atual", previdenciario[1], origem.format("Fundo Previdenciário") + ", atual")
     else:
         resultado.avisos.append(f"NES: não encontrei os fundos da RPPS em Encargos Sociais pras linhas {config.NES_LINHA_OBRIGACOES_ANTERIOR_RPPS}/{config.NES_LINHA_CONTRIB_PATRONAL_CIVIL_RPPS}.")
 
-    # --- linha 23: Encargos Militar, Fundo Financeiro, Estado Atual ---
-    pendentes_mil = list(config.CONSIGNACOES_FUNDOS_MILITAR)
-    achou_militar = False
-    for text in pages:
-        if not pendentes_mil or config.ENCARGOS_REGIME_MILITAR_TITLE not in text:
-            continue
-        lines = [l.strip() for l in text.split("\n") if l.strip()]
-        i = 0
-        while i < len(lines) and pendentes_mil:
-            if lines[i] not in _ROTULOS_SUBTOTAL:
-                i += 1
-                continue
-            rotulos, valores = _bloco_subtotal_valores(lines, i)
-            k = len(rotulos)
-            if len(valores) < 4 * k:
-                i += max(k, 1)
-                continue
-            pendentes_mil.pop(0)
-            estado = valores[k:2 * k]
-            resultado.achados.append(Achado(config.SHEET_NES, linha(config.NES_LINHA_FUNDO_GOIAS), estado[-1], "Encargos Sociais Militar — Fundo Financeiro (Contribuição do Estado)"))
-            achou_militar = True
-            i += k
-    if not achou_militar:
+    # --- linha 23 (NES) + F202/F208 (Consignações): Encargos Militar, Fundo Financeiro ---
+    fundos_militar = _ler_fundos_estado(pages, config.ENCARGOS_REGIME_MILITAR_TITLE, config.CONSIGNACOES_FUNDOS_MILITAR)
+    financeiro_militar = fundos_militar.get("FUNDO DE PREVIDENCIA (FUNDO FINANCEIRO)")
+    if financeiro_militar:
+        origem = "Encargos Sociais Militar — Fundo Financeiro (Contribuição do Estado)"
+        resultado.achados.append(Achado(config.SHEET_NES, linha(config.NES_LINHA_FUNDO_GOIAS), financeiro_militar[1], origem))
+        add_consig("militar_fundo_financeiro_atual", financeiro_militar[1], origem + ", atual")
+        if financeiro_militar[0] is not None:
+            add_consig("militar_fundo_financeiro_anterior", financeiro_militar[0], origem + ", exercício anterior")
+    else:
         resultado.avisos.append(f"NES: não encontrei o fundo da Militar em Encargos Sociais pra linha {config.NES_LINHA_FUNDO_GOIAS}.")
+
+    # --- F139/F140 (Consignações): Encargos Contrato Temporário, INSS ---
+    fundos_contrato = _ler_fundos_estado(pages, config.ENCARGOS_REGIME_CONTRATO_TITLE, config.CONSIGNACOES_CONTRATO_FUNDOS)
+    inss_contrato = fundos_contrato.get("I.N.S.S.")
+    if inss_contrato:
+        origem = "Encargos Sociais Contrato Temporário — INSS (Contribuição do Estado)"
+        add_consig("contrato_inss_atual", inss_contrato[1], origem + ", atual")
+        add_consig("contrato_inss_anterior", inss_contrato[0] or 0.0, origem + ", exercício anterior")
 
     # --- linha 16: Encargos RGPS-ativos, INSS, Contribuição do Estado ---
     achou_rgps = False
@@ -633,7 +656,9 @@ def parse_nes(pages: list[str]) -> ResultadoParse:
         if k != len(alvo) or len(valores) < 4 * k:
             break
         estado = valores[k:2 * k]
-        resultado.achados.append(Achado(config.SHEET_NES, linha(config.NES_LINHA_INSS_RGPS), estado[0], "Encargos Sociais RGPS — INSS (Contribuição do Estado)"))
+        origem = "Encargos Sociais RGPS — INSS (Contribuição do Estado)"
+        resultado.achados.append(Achado(config.SHEET_NES, linha(config.NES_LINHA_INSS_RGPS), estado[0], origem))
+        add_consig("rgps_inss_atual", estado[0], origem)
         achou_rgps = True
         break
     if not achou_rgps:

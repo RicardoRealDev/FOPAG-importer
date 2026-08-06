@@ -132,16 +132,20 @@ CONSIGNACOES_CODIGO_MAPEAMENTO = {
 
 # ---------------------------------------------------------------------------
 # 2c) "Apropriação das Consignações - Contratos RGPS" (segunda tabela da
-# aba Consignações, linhas ~109-119) -> consignações dos funcionários de
-# Contrato Temporário. Diferente do bloco principal (colunas F/G/H por
-# regime), aqui só existe UMA coluna de valor (F), porque é um regime só.
+# aba Consignações, linhas 109-130, total em F131) -> consignações dos
+# funcionários de Contrato Temporário. Diferente do bloco principal
+# (colunas F/G/H por regime), aqui só existe UMA coluna de valor (F),
+# porque é um regime só.
 # Confirmado contra REL FOPAG JULHO-01.pdf e uma planilha real de julho.
+# ATENÇÃO: a linha 122 ("BRB AUXÍLIO ALIMENTAÇÃO") tem valor real em
+# alguns meses (confirmado na planilha de referência) mas não achamos a
+# fonte no PDF ainda - fica de fora do mapeamento e é zerada/manual.
 # ---------------------------------------------------------------------------
 CONSIGNACOES_CONTRATO_MAPEAMENTO = {
     "ZAHAV ADIANT SALARIO": "119",
 }
 CONSIGNACOES_CONTRATO_ROW_START = 109
-CONSIGNACOES_CONTRATO_ROW_END = 119
+CONSIGNACOES_CONTRATO_ROW_END = 130  # F131 = SUM(F109:F130), total do bloco
 
 # INSS dos Contratos vem do relatório de Encargos Sociais (GTO0002R,
 # seção específica de Contrato Temporário) - mesma técnica/formato usado
@@ -150,6 +154,31 @@ ENCARGOS_REGIME_CONTRATO_TITLE = "ENCARGOS SOCIAIS - CONTRATO TEMPORARIO - REGIM
 CONSIGNACOES_CONTRATO_FUNDOS = [
     ("I.N.S.S.", "F109", None),
 ]
+
+# ---------------------------------------------------------------------------
+# 2d) Área de detalhe de Encargos Sociais dentro da aba Consignações
+# (linhas ~139-208, abaixo do bloco de Contratos) -> as fórmulas da aba
+# NES (coluna SALDO) puxam diretamente dessas células, então preenchê-las
+# faz a NES fechar sozinha via fórmula, sem depender só da coluna FOLHA
+# manual que escrevemos em parser.py:parse_nes.
+#
+# São os MESMOS números que já usamos pra NES (Contribuição do Estado dos
+# fundos por regime) - só espelhados numa segunda célula aqui. Confirmado
+# 10 de 10 valores exatos contra REL FOPAG JULHO-01.pdf e uma planilha
+# real de julho (inclusive a conferência final da linha 212/215 fecha
+# em ~zero quando essas células estão preenchidas certas).
+CONSIGNACOES_ENCARGOS_DETALHE = {
+    "contrato_inss_atual": "F139",
+    "contrato_inss_anterior": "F140",
+    "rgps_inss_atual": "F141",
+    "rpps_fundo_financeiro_atual": "F146",
+    "rpps_fundo_financeiro_anterior": "F153",
+    "rpps_fundo_previdenciario_anterior": "F161",
+    "rpps_fundo_previdenciario_atual": "F169",
+    "plansaude_atual": "F176",
+    "militar_fundo_financeiro_atual": "F202",
+    "militar_fundo_financeiro_anterior": "F208",
+}
 
 # ---------------------------------------------------------------------------
 # 3) ENCARGOS SOCIAIS - GERAL (GTO0002R) -> encargos sociais consolidados
@@ -348,6 +377,9 @@ def celulas_gerenciadas() -> dict[str, list[str]]:
 
     for row in range(CONSIGNACOES_CONTRATO_ROW_START, CONSIGNACOES_CONTRATO_ROW_END + 1):
         add(SHEET_CONSIGNACOES, f"F{row}")
+
+    for cell in CONSIGNACOES_ENCARGOS_DETALHE.values():
+        add(SHEET_CONSIGNACOES, cell)
 
     for linha in (
         NES_LINHA_13_SALARIO_RPPS, NES_LINHA_FERIAS_RPPS, NES_LINHA_VENC_ANTERIOR_RPPS,
