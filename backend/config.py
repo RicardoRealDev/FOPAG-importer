@@ -73,6 +73,43 @@ ENCARGOS_FUNDO_TO_CELL = {
 ENCARGOS_SECTION_TITLE = "ENCARGOS SOCIAIS - GERAL"
 
 # ---------------------------------------------------------------------------
+# 3b) ENCARGOS SOCIAIS - por regime (GTO0002R, seções específicas de cada
+# regime - NÃO a seção "GERAL" acima) -> contribuição do SEGURADO
+# (empregado) por fundo, que alimenta as linhas 14-19 da aba Consignações
+# (Fundo Financeiro, Fundo Previdenciário, INSS - "atual" e "(92) DEA" =
+# ajuste de exercício anterior).
+#
+# Confirmado manualmente contra REL FOPAG JULHO-01.pdf (6 de 6 valores
+# batendo exato com uma planilha real de julho). Cada fundo tem um bloco
+# "Subtotal (ANTERIOR)" (opcional - nem todo mês tem ajuste) + "Subtotal
+# (ATUAL)"; a RGPS-ativos é diferente: vários fundos aparecem juntos num
+# só bloco "Subtotal (ATUAL)" repetido. Usa a mesma premissa de "ordem
+# estável do relatório" já usada em FUNDOS_EM_ORDEM - se algum mês vier
+# fora da ordem esperada, o parser gera um aviso em vez de errar
+# silenciosamente.
+# ---------------------------------------------------------------------------
+ENCARGOS_REGIME_RGPS_TITLE = "ENCARGOS SOCIAIS - ATIVOS - REGIME GERAL DE PREVIDÊNCIA SOCIAL"
+ENCARGOS_REGIME_RPPS_TITLE = "ENCARGOS SOCIAIS - ATIVOS - REGIME PRÓPRIO DE PREVIDÊNCIA SOCIAL"
+ENCARGOS_REGIME_MILITAR_TITLE = "ENCARGOS SOCIAIS - MILITARES - MILITARES"
+
+# RGPS: bloco único com vários fundos lado a lado ("Subtotal (ATUAL)" x k).
+# Só o INSS tem linha dedicada na planilha hoje; PLANSAUDE aparece no
+# relatório mas fica de fora (None) até termos uma célula pra ele.
+CONSIGNACOES_FUNDOS_RGPS = [
+    ("I.N.S.S.", "G18", "G19"),
+    ("PLANSAUDE", None, None),
+]
+
+# RPPS e MILITAR: um fundo de cada vez, cada um com seu próprio bloco.
+CONSIGNACOES_FUNDOS_RPPS = [
+    ("FUNDO DE PREVIDENCIA (FUNDO FINANCEIRO)", "F14", "F15"),
+    ("FUNDO DE PREVIDENCIA (FUNDO PREVIDENCIÁRIO)", "F16", "F17"),
+]
+CONSIGNACOES_FUNDOS_MILITAR = [
+    ("FUNDO DE PREVIDENCIA (FUNDO FINANCEIRO)", "H14", "H15"),
+]
+
+# ---------------------------------------------------------------------------
 # 4) RENDIMENTOS E DESCONTOS (GTO0001R) -> IRRF retido por regime
 # ---------------------------------------------------------------------------
 IRRF_REGIME_TO_CELL = {

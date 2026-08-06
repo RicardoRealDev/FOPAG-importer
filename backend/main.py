@@ -58,10 +58,11 @@ def _processar(pdf_bytes: bytes, spreadsheet_id: str) -> dict:
     r3 = p.parse_encargos(pages)
     r4 = p.parse_irrf(pages)
     r5 = p.parse_rendimentos(pages)
+    r6 = p.parse_fundos_segurado(pages)
     mes_ano_label = p.extrair_mes_ano(pages)
 
-    achados = r1.achados + r2.achados + r3.achados + r4.achados + r5.achados
-    avisos = r1.avisos + r2.avisos + r3.avisos + r4.avisos + r5.avisos
+    achados = r1.achados + r2.achados + r3.achados + r4.achados + r5.achados + r6.achados
+    avisos = r1.avisos + r2.avisos + r3.avisos + r4.avisos + r5.avisos + r6.avisos
     return {
         "achados": achados,
         "avisos": avisos,

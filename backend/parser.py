@@ -376,6 +376,112 @@ def parse_encargos(pages: list[str]) -> ResultadoParse:
 
 
 # ---------------------------------------------------------------------------
+# 3b) ENCARGOS SOCIAIS por regime -> contribuição do segurado por fundo
+# (linhas 14-19 da aba Consignações - ver config.CONSIGNACOES_FUNDOS_*)
+# ---------------------------------------------------------------------------
+_ROTULOS_SUBTOTAL = ("Subtotal (ANTERIOR)", "Subtotal (ATUAL)")
+
+
+def _bloco_subtotal_valores(lines: list[str], idx: int) -> tuple[list[str], list[float]]:
+    """A partir de um índice que aponta pra uma linha 'Subtotal (ANTERIOR)'
+    ou 'Subtotal (ATUAL)', conta quantos rótulos desse tipo vêm em seguida
+    (k) e devolve (rótulos, valores) - os 4*k valores monetários que vêm
+    logo depois, na ordem em que aparecem (metric-major: os k valores da
+    1ª métrica - Vlr Base -, depois os k da 2ª - Contribuição do Estado -,
+    etc; Contribuição Segurado é a 3ª métrica)."""
+    rotulos = []
+    j = idx
+    while j < len(lines) and lines[j] in _ROTULOS_SUBTOTAL:
+        rotulos.append(lines[j])
+        j += 1
+    k = len(rotulos)
+    valores = []
+    for l in lines[j: j + 4 * k]:
+        if not MONEY_RE.match(l):
+            break
+        valores.append(_to_float(l))
+    return rotulos, valores
+
+
+def _parse_fundos_rgps(pages: list[str], resultado: ResultadoParse) -> None:
+    """RGPS-ativos: um bloco único com vários fundos lado a lado
+    ('Subtotal (ATUAL)' repetido k vezes)."""
+    alvo = config.CONSIGNACOES_FUNDOS_RGPS
+    for page_num, text in enumerate(pages, start=1):
+        if config.ENCARGOS_REGIME_RGPS_TITLE not in text:
+            continue
+        lines = [l.strip() for l in text.split("\n") if l.strip()]
+        idx = next((i for i, l in enumerate(lines) if l in _ROTULOS_SUBTOTAL), None)
+        if idx is None:
+            continue
+        rotulos, valores = _bloco_subtotal_valores(lines, idx)
+        k = len(rotulos)
+        if k != len(alvo) or len(valores) < 4 * k:
+            resultado.avisos.append(
+                f"Pág. {page_num}: bloco de fundos da RGPS-ativos veio com formato inesperado "
+                f"({k} rótulo(s), {len(valores)} valor(es)) - contribuição do segurado (INSS) "
+                f"não foi preenchida automaticamente. Confira manualmente."
+            )
+            return
+        segurado = valores[2 * k: 3 * k]  # 3ª métrica = Contribuição Segurado
+        origem = f"Pág. {page_num} — ENCARGOS SOCIAIS — RGPS ativos"
+        for (nome, cell_atual, _cell_anterior), valor in zip(alvo, segurado):
+            if cell_atual:
+                resultado.achados.append(Achado(config.SHEET_CONSIGNACOES, cell_atual, valor, f"{origem} — {nome}"))
+        return
+    resultado.avisos.append("Não encontrei o bloco de fundos da RGPS-ativos em ENCARGOS SOCIAIS.")
+
+
+def _parse_fundos_por_pagina_unica(pages: list[str], resultado: ResultadoParse, regime_title: str, fundos: list) -> None:
+    """RPPS e Militar: um fundo de cada vez, cada um com seu próprio bloco
+    'Subtotal (ANTERIOR)' (opcional) + 'Subtotal (ATUAL)' (sempre) -
+    assumindo que os fundos fecham na MESMA ordem declarada em
+    config.CONSIGNACOES_FUNDOS_RPPS/MILITAR (mesma premissa de
+    FUNDOS_EM_ORDEM, ver comentário acima de parse_encargos)."""
+    pendentes = list(fundos)
+    for page_num, text in enumerate(pages, start=1):
+        if not pendentes or regime_title not in text:
+            continue
+        lines = [l.strip() for l in text.split("\n") if l.strip()]
+        i = 0
+        while i < len(lines) and pendentes:
+            if lines[i] not in _ROTULOS_SUBTOTAL:
+                i += 1
+                continue
+            rotulos, valores = _bloco_subtotal_valores(lines, i)
+            k = len(rotulos)
+            if len(valores) < 4 * k:
+                i += max(k, 1)
+                continue
+            nome, cell_atual, cell_anterior = pendentes.pop(0)
+            origem = f"Pág. {page_num} — ENCARGOS SOCIAIS — {nome}"
+            if rotulos == ["Subtotal (ANTERIOR)", "Subtotal (ATUAL)"]:
+                segurado_anterior, segurado_atual = valores[4], valores[5]
+            elif rotulos == ["Subtotal (ATUAL)"]:
+                segurado_anterior, segurado_atual = None, valores[2]
+            else:
+                resultado.avisos.append(f"Pág. {page_num}: bloco de '{nome}' veio em formato inesperado ({rotulos}), pulei - confira manualmente.")
+                i += k
+                continue
+            if cell_atual:
+                resultado.achados.append(Achado(config.SHEET_CONSIGNACOES, cell_atual, segurado_atual, origem))
+            if cell_anterior and segurado_anterior is not None:
+                resultado.achados.append(Achado(config.SHEET_CONSIGNACOES, cell_anterior, segurado_anterior, f"{origem} (exercício anterior)"))
+            i += k
+
+    for nome, _cell_atual, _cell_anterior in pendentes:
+        resultado.avisos.append(f"Não encontrei o bloco 'Subtotal' de '{nome}' em ENCARGOS SOCIAIS ({regime_title}).")
+
+
+def parse_fundos_segurado(pages: list[str]) -> ResultadoParse:
+    resultado = ResultadoParse()
+    _parse_fundos_rgps(pages, resultado)
+    _parse_fundos_por_pagina_unica(pages, resultado, config.ENCARGOS_REGIME_RPPS_TITLE, config.CONSIGNACOES_FUNDOS_RPPS)
+    _parse_fundos_por_pagina_unica(pages, resultado, config.ENCARGOS_REGIME_MILITAR_TITLE, config.CONSIGNACOES_FUNDOS_MILITAR)
+    return resultado
+
+
+# ---------------------------------------------------------------------------
 # 4) RENDIMENTOS E DESCONTOS -> IRRF retido por regime
 # ---------------------------------------------------------------------------
 # Layout observado (relatorio GTO0001R, pagina "DESCONTOS" de cada regime):
